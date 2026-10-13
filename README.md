@@ -93,6 +93,8 @@ See [project knowledge](docs/project-knowledge/INDEX.md) for source evidence and
 
 ## Attachment storage and verification
 
+HTTP upload compatibility (2026-10-13): attachment selection now generates UUID upload IDs using `crypto.getRandomValues()`, which is available on HTTP origins. It no longer calls the secure-context-only `crypto.randomUUID()` that failed on the EC2 HTTP address. IDs retain the server's GUID format and are reused on retries. All 44 Node tests and the production build passed, including missing-`randomUUID` and multiple-selection coverage. No backend change or new dependency is required; commit and redeploy this frontend. Real AWS uploads were not reverified for this fix.
+
 Office support (2026-10-13): Word `.doc/.docx`, Excel `.xls/.xlsx`, and PowerPoint `.ppt/.pptx` are accepted with the same 10 MB limit. Modern packages are checked for matching content-type metadata/main parts; legacy files use the shared compound-file header. Full document decoding and malware scanning are not provided. 41 Node tests, frontend/API builds and 358 disposable SQL/HTTP assertions passed, including Office upload/download/removal and invalid package rejection. Browser layout and real S3 were not reverified for this extension. Rebuild/restart the updated API manually; this extension needs no SQL schema change.
 
 Development uses a private `.local-task-attachments` folder in the Server repository by default; it is ignored by Git and excluded from publishing. SQL stores metadata, permissions and storage keys. No AWS credentials or browser storage are needed for local development. Rebuild/start the updated API yourself to install scripts `027`–`028` and the attachment procedures.

@@ -4,6 +4,7 @@ import { Download, FileText, Paperclip, RefreshCw, Trash2, Upload, X } from 'luc
 import { request, uploadFile } from '../../app/api';
 import { invalidateTaskDetails } from '../../app/store';
 import { attachmentAccept, attachmentError, attachmentSize } from './attachmentValidation';
+import { createAttachmentUploadId } from './attachmentUploadId';
 import { loadTaskAttachments, removeTaskAttachment } from './attachmentState';
 
 export default function TaskAttachments({ taskId, active, onEditingChange, onHistoryChange }) {
@@ -70,7 +71,7 @@ export default function TaskAttachments({ taskId, active, onEditingChange, onHis
         }
         const selected = Array.from(files).map((file) => {
             const invalid = attachmentError(file);
-            return { id: crypto.randomUUID(), file, status: invalid ? 'invalid' : 'queued', error: invalid, progress: 0 };
+            return { id: createAttachmentUploadId(), file, status: invalid ? 'invalid' : 'queued', error: invalid, progress: 0 };
         });
         setQueue((current) => [...current, ...selected]);
         setError(null);

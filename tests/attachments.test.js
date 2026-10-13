@@ -1,9 +1,42 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { attachmentError, attachmentSize, maxAttachmentBytes } from '../src/features/tasks/attachmentValidation.js';
+import { createAttachmentUploadId } from '../src/features/tasks/attachmentUploadId.js';
 import { loadTaskAttachments, removeTaskAttachment } from '../src/features/tasks/attachmentState.js';
 import { store, login, logout, loadWorkspace } from '../src/app/store.js';
 import { uploadFile } from '../src/app/api.js';
+
+test('upload IDs remain valid UUIDs when HTTP crypto does not expose randomUUID', () => {
+    for (const [fill, expected] of [
+        [0, '00000000-0000-4000-8000-000000000000'],
+        [255, 'ffffffff-ffff-4fff-bfff-ffffffffffff'],
+    ]) {
+        const httpCrypto = {
+            getRandomValues(bytes) {
+                assert.ok(bytes instanceof Uint8Array);
+                assert.equal(bytes.length, 16);
+                return bytes.fill(fill);
+            },
+        };
+        assert.equal(httpCrypto.randomUUID, undefined);
+        assert.equal(createAttachmentUploadId(httpCrypto), expected);
+    }
+});
+
+test('multiple file selections get distinct upload IDs from browser random bytes', () => {
+    const httpCrypto = {
+        getRandomValues(bytes) {
+            return globalThis.crypto.getRandomValues(bytes);
+        },
+    };
+    const ids = new Set();
+    for (let index = 0; index < 200; index++) {
+        const id = createAttachmentUploadId(httpCrypto);
+        assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        ids.add(id);
+    }
+    assert.equal(ids.size, 200);
+});
 
 test('attachment selection allows PDFs/images/Office documents and rejects empty, oversized and unsupported files', () => {
     assert.equal(attachmentError({ name: 'review.PDF', size: maxAttachmentBytes }), null);
