@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import json
+from urllib.parse import urlsplit
 
 SNIPPET = Path('/etc/nginx/snippets/parallel-systems-task-management.conf')
 TIMESHEET_ROOT = '/var/www/parallel-systems-timesheet/current'
@@ -150,6 +151,44 @@ def checked_nginx_path(path):
     return resolved
 
 
+def task_api_location(text, host, default_server=False):
+    """Clone the existing API proxy settings into a task-only upload location."""
+    locations = []
+    for server in walk(parse(text)):
+        if server.words != ['server']:
+            continue
+        names = [name for node in server.children if node.words[0] == 'server_name' for name in node.words[1:]]
+        roots = [node.words[1:] for node in server.children if node.words[0] == 'root']
+        unnamed = not names or all(name == '_' for name in names)
+        default = any(node.words[0] == 'listen' and 'default_server' in node.words for node in server.children)
+        selected = unnamed and default if default_server else host in names
+        if not selected or [TIMESHEET_ROOT] not in roots or any(node.words[0] == 'return' for node in server.children):
+            continue
+        api = [node for node in server.children if node.words in (['location', '/api/'], ['location', '^~', '/api/'])]
+        if len(api) != 1:
+            raise ValueError('Expected one direct /api/ proxy to configure Task Management upload limits.')
+        proxy = [node for node in api[0].children if node.words[0] == 'proxy_pass']
+        if len(proxy) != 1 or len(proxy[0].words) != 2:
+            raise ValueError('Expected one explicit API proxy_pass; configure Task Management uploads manually.')
+        url = urlsplit(proxy[0].words[1])
+        if url.scheme not in ('http', 'https') or not url.netloc or url.path not in ('', '/api/') or url.query or url.fragment or '$' in proxy[0].words[1]:
+            raise ValueError('Unsupported API proxy URL; configure Task Management uploads manually.')
+        body = []
+        for node in api[0].children:
+            if node.words[0] in ('rewrite', 'location', 'if'):
+                raise ValueError('Custom API rewrite/nesting requires manual Task Management upload configuration.')
+            if node.words[0] in ('client_max_body_size', 'proxy_read_timeout', 'proxy_send_timeout', 'client_body_timeout'):
+                continue
+            if node.words[0] == 'proxy_pass' and url.path == '/api/':
+                body.append(f'proxy_pass {url.scheme}://{url.netloc}/api/task-management/;')
+            else:
+                body.append(text[node.start:node.end])
+        body.extend(['client_max_body_size 12m;', 'proxy_read_timeout 180s;',
+                     'proxy_send_timeout 180s;', 'client_body_timeout 180s;'])
+        locations.append('location ^~ /api/task-management/ {\n    ' + '\n    '.join(body) + '\n}\n')
+    return locations
+
+
 def restore(state_path):
     state = json.loads(state_path.read_text())
     for entry in state['files']:
@@ -180,9 +219,12 @@ def prepare(host, source, state_path):
         configs[target] = target.read_text()
     updates = {}
     matches = 0
+    task_proxies = []
     for target, text in configs.items():
         updated, count = plan_config(text, host)
         matches += count
+        if count:
+            task_proxies.extend(task_api_location(text, host))
         if updated != text:
             updates[target] = updated
     if not matches:
@@ -195,6 +237,7 @@ def prepare(host, source, state_path):
                 defaults.append((target, text, updated, count))
         if len(defaults) == 1:
             target, text, updated, matches = defaults[0]
+            task_proxies.extend(task_api_location(text, host, default_server=True))
             if updated != text:
                 updates[target] = updated
             print('Using the unique unnamed default Timesheet server configuration.')
@@ -206,6 +249,9 @@ def prepare(host, source, state_path):
     snippet = source.read_text()
     if not snippet.startswith('# Parallel Systems Task Management deployment-managed snippet'):
         raise ValueError('Unexpected task-management snippet source.')
+    if len(set(task_proxies)) != 1:
+        raise ValueError('Task Management API proxy differs between server blocks; configure uploads manually.')
+    snippet += '\n# Task-only API upload limits; proxy settings copied from the active /api/ location.\n' + task_proxies[0]
     snippet_target = checked_nginx_path(SNIPPET)
     if snippet_target != SNIPPET:
         raise ValueError('Task Management snippet must not be a symlink.')

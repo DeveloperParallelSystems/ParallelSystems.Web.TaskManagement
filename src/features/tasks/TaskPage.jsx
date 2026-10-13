@@ -9,6 +9,7 @@ import { needsReviewNote } from './taskActions';
 import { shouldBlockTaskNavigation } from './taskNavigation';
 import TaskDiscussion from './TaskDiscussion';
 import TaskPageTabs from './TaskPageTabs';
+import TaskAttachments from './TaskAttachments';
 
 const emptyTask = {
     title: '',
@@ -44,9 +45,11 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
     const [linkMessage, setLinkMessage] = useState('');
     const [createdId, setCreatedId] = useState(null);
     const [discussionEditing, setDiscussionEditing] = useState({ dirty: false, saving: false });
+    const [attachmentEditing, setAttachmentEditing] = useState({ dirty: false, saving: false });
+    const historyRequest = useRef(null);
     const [activeTab, setActiveTab] = useState('details');
-    const unsaved = dirty || discussionEditing.dirty;
-    const pendingSave = saving || discussionEditing.saving;
+    const unsaved = dirty || discussionEditing.dirty || attachmentEditing.dirty;
+    const pendingSave = saving || discussionEditing.saving || attachmentEditing.saving;
     const editable = id === 'new' ? administrator : details?.canEditDetails;
     const allowedStatuses = id === 'new' ? ['Backlog', 'To Do'] : details?.allowedStatuses || [];
     let saveMessage = id === 'new' ? 'Not saved yet' : 'Task details saved';
@@ -69,6 +72,7 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
 
     useEffect(() => {
         return () => {
+            historyRequest.current?.abort();
             onEditingChange({ dirty: false, saving: false });
         };
     }, [onEditingChange]);
@@ -152,6 +156,24 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
     function change(name, value) {
         setDirty(true);
         setValues((current) => changeTaskField(current, name, value));
+    }
+
+    async function refreshHistory() {
+        historyRequest.current?.abort();
+        const controller = new AbortController();
+        historyRequest.current = controller;
+        try {
+            const latest = await request(`/tasks/${id}`, { signal: controller.signal });
+            setDetails((current) => current ? { ...current, activity: latest.activity } : current);
+        }
+        catch (failure) {
+            if (!controller.signal.aborted) {
+                setError({ message: `The file change was saved, but History could not refresh: ${failure.message}` });
+                if (failure.status === 404) {
+                    setDetails(null);
+                }
+            }
+        }
     }
 
     async function copyLink() {
@@ -257,7 +279,7 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
                     )}
                     {linkMessage && <p role="status">{linkMessage}</p>}
                 </div>
-                <TaskPageTabs value={activeTab} onChange={setActiveTab} />
+                <TaskPageTabs value={activeTab} onChange={setActiveTab} attachmentsDisabled={id === 'new'} />
             </div>
             <div id="task-details-panel" className="task-tab-panel" role="tabpanel"
                 aria-labelledby="task-details-tab" tabIndex={0} hidden={activeTab !== 'details'}>
@@ -479,6 +501,13 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
                     </section>
                 )}
             </div>
+            <div id="task-attachments-panel" className="task-tab-panel" role="tabpanel"
+                aria-labelledby="task-attachments-tab" tabIndex={0} hidden={activeTab !== 'attachments'}>
+                {id !== 'new' && <TaskAttachments
+                    key={JSON.stringify(people.map((person) => [person.id, person.userId, person.accountIsActive]))}
+                    taskId={id} active={activeTab === 'attachments'} onEditingChange={setAttachmentEditing}
+                    onHistoryChange={refreshHistory} />}
+            </div>
             {blocker.state === 'blocked' && (
                 <dialog
                     ref={confirmRef}
@@ -494,7 +523,7 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
                         <h2 id="discard-task-title">{pendingSave ? 'Saving changes…' : 'Discard your unsaved changes?'}</h2>
                         <p id="discard-task-description">
                             {pendingSave ? 'Wait for the save to finish before leaving this task.' :
-                                'Your task edits and unposted comment draft will be lost if you leave this page.'}
+                                'Your task edits, unposted comment draft and queued files will be lost if you leave this page.'}
                         </p>
                     </div>
                     <div className="drawer-footer">

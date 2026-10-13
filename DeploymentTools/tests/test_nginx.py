@@ -35,6 +35,27 @@ def temporary_fixture(prefix):
 
 
 class NginxSetupChecks(unittest.TestCase):
+    def test_task_upload_proxy_preserves_headers_and_does_not_change_shared_api(self):
+        original = CONFIG.replace('proxy_pass http://127.0.0.1:5185;',
+                                  'proxy_pass http://127.0.0.1:5185; proxy_set_header X-Forwarded-Proto $scheme; client_max_body_size 1m;')
+        location = nginx.task_api_location(original, HOST)[0]
+        self.assertIn('location ^~ /api/task-management/', location)
+        self.assertIn('proxy_set_header X-Forwarded-Proto $scheme;', location)
+        self.assertIn('client_max_body_size 12m;', location)
+        self.assertNotIn('client_max_body_size 1m;', location)
+        self.assertIn('proxy_pass http://127.0.0.1:5185;', location)
+        self.assertIn('client_max_body_size 1m;', nginx.plan_config(original, HOST)[0])
+
+    def test_task_upload_proxy_preserves_api_uri_mapping(self):
+        original = CONFIG.replace('proxy_pass http://127.0.0.1:5185;', 'proxy_pass http://127.0.0.1:5185/api/;')
+        self.assertIn('proxy_pass http://127.0.0.1:5185/api/task-management/;', nginx.task_api_location(original, HOST)[0])
+
+    def test_custom_api_rewrites_stop_before_upload_configuration(self):
+        with self.assertRaises(ValueError):
+            nginx.task_api_location(CONFIG.replace('proxy_pass http://127.0.0.1:5185;', 'proxy_pass http://127.0.0.1:5185/custom/;'), HOST)
+        with self.assertRaises(ValueError):
+            nginx.task_api_location(CONFIG.replace('location /api/', 'location /custom-api/'), HOST)
+
     def test_existing_ip_named_site_can_be_selected_explicitly(self):
         original = CONFIG.replace(HOST, '3.24.250.195')
         updated, matched = nginx.plan_config(original, '3.24.250.195')
@@ -164,7 +185,9 @@ class NginxSetupChecks(unittest.TestCase):
                  patch.object(nginx.subprocess, 'run', side_effect=[result, subprocess.CompletedProcess([], 0)]):
                 nginx.prepare(HOST, source, state)
                 self.assertIn(f'include {snippet};', config.read_text())
-                self.assertEqual(snippet.read_text(), source.read_text())
+                self.assertTrue(snippet.read_text().startswith(source.read_text()))
+                self.assertIn('location ^~ /api/task-management/', snippet.read_text())
+                self.assertIn('client_max_body_size 12m;', snippet.read_text())
                 nginx.restore(state)
                 self.assertEqual(config.read_text(), CONFIG)
                 self.assertEqual(snippet.read_text(), original_snippet)

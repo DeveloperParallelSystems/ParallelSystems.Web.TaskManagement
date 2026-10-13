@@ -4,11 +4,10 @@ import { History, Paperclip } from 'lucide-react';
 const tabs = [
     { key: 'details', label: 'Details' },
     { key: 'history', label: 'History', icon: History },
-    { key: 'attachments', label: 'Attachments', icon: Paperclip, disabled: true,
-        tooltip: 'Attachments — coming soon' },
+    { key: 'attachments', label: 'Attachments', icon: Paperclip },
 ];
 
-export default function TaskPageTabs({ value, onChange }) {
+export default function TaskPageTabs({ value, onChange, attachmentsDisabled = false }) {
     const buttons = useRef([]);
     const [focused, setFocused] = useState(value);
     const [tooltip, setTooltip] = useState(null);
@@ -38,7 +37,7 @@ export default function TaskPageTabs({ value, onChange }) {
         }
         event.preventDefault();
         buttons.current[next]?.focus();
-        if (!tabs[next].disabled) {
+        if (!(tabs[next].key === 'attachments' && attachmentsDisabled)) {
             onChange(tabs[next].key);
         }
     }
@@ -48,6 +47,7 @@ export default function TaskPageTabs({ value, onChange }) {
             {tabs.map((tab, index) => {
                 const Icon = tab.icon;
                 const visible = tooltip === tab.key;
+                const disabled = tab.key === 'attachments' && attachmentsDisabled;
                 return (
                     <button
                         key={tab.key}
@@ -60,12 +60,12 @@ export default function TaskPageTabs({ value, onChange }) {
                         className="task-page-tab"
                         aria-label={tab.label}
                         aria-selected={value === tab.key}
-                        aria-disabled={tab.disabled || undefined}
-                        aria-controls={tab.disabled ? undefined : `task-${tab.key}-panel`}
+                        aria-disabled={disabled || undefined}
+                        aria-controls={disabled ? undefined : `task-${tab.key}-panel`}
                         aria-describedby={visible ? `task-${tab.key}-tooltip` : undefined}
                         tabIndex={focused === tab.key ? 0 : -1}
                         onClick={() => {
-                            if (!tab.disabled) {
+                            if (!disabled) {
                                 onChange(tab.key);
                             }
                         }}
@@ -85,7 +85,7 @@ export default function TaskPageTabs({ value, onChange }) {
                         {Icon ? <Icon size={19} aria-hidden="true" /> : tab.label}
                         {visible && (
                             <span id={`task-${tab.key}-tooltip`} role="tooltip" className="task-tab-tooltip">
-                                {tab.tooltip || tab.label}
+                                {disabled ? 'Save this task to add attachments' : tab.label}
                             </span>
                         )}
                     </button>

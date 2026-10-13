@@ -1,6 +1,6 @@
 # Task Management API extensions
 
-Comments and mentions were implemented in the frontend and sibling Server repository on 2026-10-13 with explicit approval. Other sections remain proposals. All paths below use `/api/task-management`, the dedicated cookie, no-store responses, and `X-Task-Management: 1` on mutations.
+Comments, mentions and file attachments were implemented in the frontend and sibling Server repository on 2026-10-13 with explicit approval. Other sections remain proposals. All paths below use `/api/task-management`, the dedicated cookie, no-store responses, and `X-Task-Management: 1` on mutations.
 
 ## Common contract
 
@@ -25,17 +25,18 @@ Existing `WorkTaskRecord` responses omit `createdById`, although task creation i
 - Permissions: current task participants and administrators may comment; author or administrator may edit/delete only while retaining task access. Mention candidates must be Staff Information records linked to other active accounts with existing task access, including linked administrators. The signed-in account is excluded from candidates; self-mentions on create/edit return 400 with `You cannot mention yourself.` for all roles. Mentions never grant access. Newly added distinct recipients get one in-app notification; unchanged mention recipients on edit get none. Inbox permissions are rechecked on read.
 - Bounds: plain text, nonblank body, 4,000 characters, at most 20 mention spans. Spans use UTF-16 offsets into exact `@Name` tokens, validated against current staff identity/access inside the transaction. Repeated mentions of one person may have separate spans. Replies target a top-level comment on the same task; retained deleted roots can continue receiving replies.
 - DB: `024_work_task_comments.sql`, `025_work_task_comment_mentions.sql`, `026_work_task_comment_history.sql`, `v_WorkTaskMentionPeople`, `sp_WorkTaskCommentsGet/Save`. Task/author/parent/staff/recipient FKs, numeric identity, own version, snapshots, soft deletion and previous-version audit. Comment writes do not change task version/status or replace workflow/review notes. Comment/history/mention notification writes commit together.
-- Evidence: sibling Server `Controllers/WorkTaskCommentsController.cs`, `Data/WorkTaskCommentRepository.cs`, `Tests/TaskManagementChecks/DiscussionChecks.cs`; frontend `TaskDiscussion.jsx`, `discussionState.js`, `commentMentions.js`, `tests/comments.test.js`. No email/rich-text/attachment endpoints were added.
+- Evidence: sibling Server `Controllers/WorkTaskCommentsController.cs`, `Data/WorkTaskCommentRepository.cs`, `Tests/TaskManagementChecks/DiscussionChecks.cs`; frontend `TaskDiscussion.jsx`, `discussionState.js`, `commentMentions.js`, `tests/comments.test.js`. Discussion does not add email, rich text or comment-bound attachment endpoints.
 
-## 2. Attachments and external links
+## 2. File attachments — implemented; external links — proposed
 
-- `GET /tasks/{id}/attachments` → `{ items: [{ id, name, kind, contentType, sizeBytes, url, uploadedById, createdAtUtc, version }] }`.
-- `POST /tasks/{id}/attachments` multipart file + optional description → 201 attachment metadata.
+- `GET /tasks/{id}/attachments` → plain array of `{ id, taskId, fileName, contentType, sizeBytes, sha256, uploadedById, uploadedByName, createdAtUtc, version, canDelete }`. Storage location/state are not exposed.
+- `POST /tasks/{id}/attachments` multipart `file` + GUID `uploadId` → 201 metadata and Location. Reuse the upload ID on retry for the same file/task/uploader; completed retries are idempotent and failed attempts use new private keys.
 - `GET /tasks/{id}/attachments/{attachmentId}/content` → authorized binary download.
-- `POST /tasks/{id}/links` with `{ name, url, description }` → 201 link metadata.
+- Proposed only: `POST /tasks/{id}/links` with `{ name, url, description }` → 201 link metadata. No external-link UI or endpoint exists.
 - `DELETE /tasks/{id}/attachments/{attachmentId}` with `{ version }` → 204.
-- Permissions: current task participants may add; uploader or administrator may remove. Download access is checked each time; storage URLs must not grant permanent public access. Allow HTTPS links; do not fetch arbitrary link destinations on the server.
-- DB: task-linked metadata, uploader, storage object key (not file blobs in task rows), type/size/hash/version, removal audit. Define size limits, allowed file types and scanning/storage retention before implementation. External links store validated URL/name separately from file content.
+- Permissions: current task participants/administrators may add and download; uploader or administrator may remove only while retaining current task access. Attachment changes have independent versions and add task History without changing task version/workflow. Invalid input is 400, inaccessible resources 404, forbidden removal 403, conflicts 409, storage failures 503.
+- Bounds/storage: non-empty PDF/PNG/JPEG and Word (`.doc`, `.docx`), Excel (`.xls`, `.xlsx`), PowerPoint (`.ppt`, `.pptx`) up to 10 MiB, 12 MiB multipart request cap, validated signatures/extensions/types and sanitized filenames. Modern Office packages additionally require matching content-type metadata and a main document part; legacy formats use the shared compound-file header. Validation is not antivirus scanning or full document decoding. Private Local storage in Development, private S3 otherwise; downloads pass through the API. Soft removal retains bytes/audit indefinitely; failed and abandoned upload attempts have durable background cleanup.
+- DB/evidence: `027_work_task_attachments.sql`, `028_work_task_attachment_cleanup.sql`, `sp_WorkTaskAttachmentsGet/Save/Fail/Cleanup.sql`, sibling Server controller/repository/storage services and `AttachmentChecks.cs`; frontend `TaskAttachments.jsx`, `attachmentState.js`, `attachmentValidation.js`, `tests/attachments.test.js`. Real S3/IAM and production deployment remain unverified. For future links, validate HTTPS URLs without fetching arbitrary destinations and store URL/name separately.
 
 ## 3. Checklists and subtasks
 
@@ -107,4 +108,4 @@ Existing `WorkTaskRecord` responses omit `createdById`, although task creation i
 
 ## Adoption gates
 
-The remaining proposals need coordinated server implementation, migration tests, authorization/visibility tests, a documented payload, and integration verification before UI development. The frontend calls only implemented task, notification and discussion contracts.
+The remaining proposals need coordinated server implementation, migration tests, authorization/visibility tests, a documented payload, and integration verification before UI development. The frontend calls only implemented task, notification, discussion and attachment contracts.

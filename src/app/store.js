@@ -2,6 +2,7 @@ import { configureStore, createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { request, setSessionExpiredHandler } from './api.js';
 import { canMoveTask, needsReviewNote, taskInput } from '../features/tasks/taskActions.js';
 import { addDiscussionReducers } from '../features/tasks/discussionState.js';
+import { addAttachmentReducers } from '../features/tasks/attachmentState.js';
 
 export const loadTaskDetail = createAsyncThunk('workspace/detail', async ({ id }, { rejectWithValue, signal }) => {
     try {
@@ -193,6 +194,7 @@ const emptyWorkspace = {
     hasLoaded: false,
     details: {},
     discussions: {},
+    attachments: {},
     detailRequests: {},
     bulkRequestId: null,
     bulkBusy: false,
@@ -231,12 +233,18 @@ const workspaceSlice = createSlice({
                 state.details = {};
                 state.detailRequests = {};
                 state.discussions = {};
+                state.attachments = {};
             }
             state.status = 'ready';
             state.hasLoaded = true;
             for (const id of Object.keys(state.discussions)) {
                 if (!state.tasks.some((task) => task.id === id)) {
                     delete state.discussions[id];
+                }
+            }
+            for (const id of Object.keys(state.attachments)) {
+                if (!state.tasks.some((task) => task.id === id)) {
+                    delete state.attachments[id];
                 }
             }
             for (const [id, details] of Object.entries(state.details)) {
@@ -293,6 +301,7 @@ const workspaceSlice = createSlice({
             }
         });
         addDiscussionReducers(builder);
+        addAttachmentReducers(builder);
         builder.addCase(logout.fulfilled, () => emptyWorkspace);
         builder.addCase(authSlice.actions.sessionExpired, () => emptyWorkspace);
         builder.addCase(login.fulfilled, () => emptyWorkspace);

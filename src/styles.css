@@ -867,6 +867,94 @@ th {
 .task-tab-panel[hidden] {
     display: none;
 }
+.task-attachments {
+    padding: 24px;
+    min-width: 0;
+}
+.task-attachments .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+.attachment-heading,
+.attachment-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.attachment-heading {
+    justify-content: space-between;
+}
+.attachment-heading h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+.attachment-dropzone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 28px 16px;
+    margin: 20px 0;
+    border: 2px dashed var(--line);
+    border-radius: 12px;
+    background: #f5f8f2;
+    color: var(--muted);
+    text-align: center;
+}
+.attachment-dropzone.is-dragging {
+    border-color: var(--green);
+    background: #eaf1e5;
+}
+.attachment-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+}
+.attachment-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+}
+.attachment-row > svg {
+    flex-shrink: 0;
+    color: var(--green);
+}
+.attachment-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 200px;
+    min-width: 0;
+    gap: 6px;
+    overflow-wrap: anywhere;
+}
+.attachment-info progress {
+    width: 100%;
+    accent-color: var(--green);
+}
+.attachment-info .muted,
+.attachment-info .error-text {
+    font-size: 12px;
+}
+.attachment-info .error-text {
+    color: #9f3f3f;
+}
+.attachment-queue {
+    margin-bottom: 28px;
+}
 .task-tab-panel:focus-visible {
     outline: 2px solid var(--green);
     outline-offset: 4px;

@@ -76,6 +76,15 @@ servers are skipped. Existing root, API/health proxies, Receipts include, and TL
 settings are preserved. Subsequent deployments do not duplicate the include.
 Conflicting Task Management locations or ambiguous sites cause the tool to stop.
 
+For attachments, automatic setup also copies the existing direct `/api/` proxy
+settings into a more specific `/api/task-management/` location in the managed
+snippet. It sets `client_max_body_size 12m`, `client_body_timeout 180s`,
+`proxy_read_timeout 180s` and `proxy_send_timeout 180s`, preserving upstream and
+proxy headers. The file limit in the API remains 10 MiB; the extra request space
+allows multipart overhead. The shared API location and other apps keep their
+existing settings. Custom proxy rewrites, variable/custom URI targets, nested
+locations or differing selected upstreams require manual setup before any write.
+
 Routing redirects `/task-management` to `/task-management/` and supports client-side
 routes, including `/task-management/tasks/{guid}`. Missing assets return 404.
 Hashed assets have a one-year cache lifetime; HTML and the logo require revalidation.
@@ -132,7 +141,17 @@ If automatic discovery rejects a custom layout, back up the correct active site,
 install `task-management.nginx.conf` at the snippet path above, and insert its
 include inside the existing content-serving server block. Preserve the current
 Timesheet, Receipts, API, health and TLS settings. Test with `sudo nginx -t` before
-reloading. Then run:
+reloading.
+
+The static snippet contains frontend routing only. For uploads, also add a
+specific `/api/task-management/` proxy location by copying the current `/api/`
+upstream, headers and TLS/proxy settings; add the 12m/180s directives above.
+Preserve `/api/task-management/` at the API: an upstream `proxy_pass` without a
+URI is unchanged, while an existing `/api/` URI suffix must become
+`/api/task-management/` in this more specific location. Avoid duplicating an
+existing task API location. `SkipNginxSetup` does not configure upload limits.
+
+Then run:
 
 ```powershell
 .\Deploy-ParallelSystems-TaskManagement.ps1 -SkipNginxSetup
