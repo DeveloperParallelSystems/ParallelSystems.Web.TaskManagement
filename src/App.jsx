@@ -4,7 +4,8 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'reac
 import { Bell, CheckSquare2, FolderOpen, FolderPlus, LayoutDashboard, LogOut, Plus, RefreshCw } from 'lucide-react';
 import { checkSession, loadWorkspace, logout } from './app/store';
 import LoginPage from './features/auth/LoginPage';
-import TaskDrawer from './features/tasks/TaskDrawer';
+import TaskPage from './features/tasks/TaskPage';
+import { taskIdFromPath } from './features/tasks/taskNavigation';
 import ProjectDialog from './features/projects/ProjectDialog';
 import NotificationsPage from './features/tasks/NotificationsPage';
 import TasksPage from './features/tasks/TasksPage';
@@ -34,26 +35,27 @@ export default function App() {
     const dispatch = useDispatch();
     const auth = useSelector((state) => state.auth);
     const workspace = useSelector((state) => state.workspace);
-    const [draftSelected, setDraftSelected] = useState(null);
+    const [taskEditing, setTaskEditing] = useState({ dirty: false, saving: false });
     const [creatingProject, setCreatingProject] = useState(false);
     const [toast, setToast] = useState('');
     const location = useLocation();
     const navigate = useNavigate();
-    const taskRoute = location.pathname.match(/^\/tasks\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i);
-    const selected = draftSelected || taskRoute?.[1] || null;
+    const selected = taskIdFromPath(location.pathname);
     const { title, description } = pages[location.pathname] || pages['/tasks'];
+    let breadcrumbTitle = title;
+    if (selected) {
+        breadcrumbTitle = selected === 'new' ? 'New task' : 'Task details';
+    }
 
-    function setSelected(id) {
-        if (id === 'new') {
-            setDraftSelected(id);
-            return;
-        }
-        setDraftSelected(null);
+    function setSelected(id, status = null) {
         if (id) {
-            navigate(`/tasks/${id}`);
+            navigate(
+                { pathname: `/tasks/${id}`, search: location.search },
+                { state: { initialStatus: status } },
+            );
         }
-        else if (taskRoute) {
-            navigate('/tasks');
+        else {
+            navigate({ pathname: '/tasks', search: location.search });
         }
     }
 
@@ -62,7 +64,7 @@ export default function App() {
     }, [dispatch]);
 
     useEffect(() => {
-        setDraftSelected(null);
+        setTaskEditing({ dirty: false, saving: false });
         setCreatingProject(false);
         if (auth.status !== 'authenticated') {
             return;
@@ -82,6 +84,22 @@ export default function App() {
             window.clearInterval(timer);
         };
     }, [auth.status, auth.user?.userId, dispatch]);
+
+    useEffect(() => {
+        function createShortcut(event) {
+            const editing = event.target.closest('input, textarea, select, [contenteditable="true"]');
+            if (event.key.toLowerCase() === 'c' && !editing && !event.ctrlKey && !event.metaKey && !event.altKey &&
+                auth.user?.role === 'Administrator' && workspace.status === 'ready' && !selected &&
+                !document.querySelector('dialog[open]')) {
+                event.preventDefault();
+                navigate({ pathname: '/tasks/new', search: location.search });
+            }
+        }
+        window.addEventListener('keydown', createShortcut);
+        return () => {
+            window.removeEventListener('keydown', createShortcut);
+        };
+    }, [auth.user?.role, workspace.status, selected, navigate, location.search]);
 
     useEffect(() => {
         const timer = setTimeout(() => setToast(''), 4500);
@@ -118,43 +136,39 @@ export default function App() {
                         <small>Workspace</small>
                     </div>
                 </div>
-                <div className="nav-label">WORKSPACE</div>
-                <nav aria-label="Workspace">
-                    <NavLink to="/dashboard">
-                        <LayoutDashboard size={19} />
-                        Dashboard
-                    </NavLink>
-                    <NavLink to="/tasks">
-                        <CheckSquare2 size={19} />
-                        Task Management
-                    </NavLink>
-                    <NavLink to="/projects">
-                        <FolderOpen size={19} />
-                        Projects
-                    </NavLink>
-                    <NavLink to="/notifications">
-                        <Bell size={19} />
-                        Notifications
-                        {workspace.notifications.unreadCount > 0 && (
-                            <span className="notification-count">{workspace.notifications.unreadCount}</span>
-                        )}
-                    </NavLink>
-                </nav>
-                <div className="sidebar-note">
-                    <span className="note-icon">
-                        <CheckSquare2 size={18} />
-                    </span>
-                    <strong>One team. Clear next steps.</strong>
-                    <p>A shared workflow for development, drafting, review, and delivery.</p>
-                </div>
-                <div className="sidebar-footer">
-                    PARALLEL SYSTEMS<span>Task Management</span>
+                <div className="sidebar-navigation">
+                    <div className="nav-label">WORKSPACE</div>
+                    <nav aria-label="Workspace">
+                        <NavLink to="/dashboard">
+                            <LayoutDashboard size={19} />
+                            Dashboard
+                        </NavLink>
+                        <NavLink to="/tasks">
+                            <CheckSquare2 size={19} />
+                            Task Management
+                        </NavLink>
+                        <NavLink to="/projects">
+                            <FolderOpen size={19} />
+                            Projects
+                        </NavLink>
+                        <NavLink to="/notifications">
+                            <Bell size={19} />
+                            Notifications
+                            {workspace.notifications.unreadCount > 0 && (
+                                <span className="notification-count">{workspace.notifications.unreadCount}</span>
+                            )}
+                        </NavLink>
+                    </nav>
+                    <div className="sidebar-footer">
+                        PARALLEL SYSTEMS<span>Task Management</span>
+                    </div>
                 </div>
             </aside>
             <div className="main">
                 <header className="topbar">
                     <div className="breadcrumb">
-                        Workspace <span>/</span> <strong>{title}</strong>
+                        Workspace <span>/</span>
+                        <strong>{breadcrumbTitle}</strong>
                     </div>
                     <div className="account">
                         <span className="avatar">{initials(auth.user.name)}</span>
@@ -166,51 +180,57 @@ export default function App() {
                             className="icon-button"
                             aria-label="Sign out"
                             title="Sign out"
-                            disabled={auth.busy}
-                            onClick={() => dispatch(logout())}
+                            disabled={auth.busy || taskEditing.saving}
+                            onClick={() => {
+                                if (!taskEditing.dirty || window.confirm('Discard your unsaved changes and sign out?')) {
+                                    dispatch(logout());
+                                }
+                            }}
                         >
                             <LogOut size={18} />
                         </button>
                     </div>
                 </header>
                 <main className="content">
-                    <div className="page-heading">
-                        <div>
-                            <span className="eyebrow">YOUR WORKSPACE</span>
-                            <h1>{title}</h1>
-                            <p>{description}</p>
-                        </div>
-                        <div className="page-actions">
-                            {auth.user.role === 'Administrator' && title === 'Projects' && (
+                    {!selected && (
+                        <div className="page-heading">
+                            <div>
+                                <span className="eyebrow">YOUR WORKSPACE</span>
+                                <h1>{title}</h1>
+                                <p>{description}</p>
+                            </div>
+                            <div className="page-actions">
+                                {auth.user.role === 'Administrator' && title === 'Projects' && (
+                                    <button
+                                        className="button"
+                                        disabled={!workspace.hasLoaded}
+                                        onClick={() => setCreatingProject(true)}
+                                    >
+                                        <FolderPlus size={17} />
+                                        New project
+                                    </button>
+                                )}
                                 <button
                                     className="button"
-                                    disabled={!workspace.hasLoaded}
-                                    onClick={() => setCreatingProject(true)}
+                                    disabled={workspace.status === 'loading'}
+                                    onClick={() => dispatch(loadWorkspace())}
                                 >
-                                    <FolderPlus size={17} />
-                                    New project
+                                    <RefreshCw size={15} />
+                                    <span>Refresh</span>
                                 </button>
-                            )}
-                            <button
-                                className="button"
-                                disabled={workspace.status === 'loading'}
-                                onClick={() => dispatch(loadWorkspace())}
-                            >
-                                <RefreshCw size={15} />
-                                <span>Refresh</span>
-                            </button>
-                            {auth.user.role === 'Administrator' && (
-                                <button
-                                    className="button primary"
-                                    disabled={workspace.status !== 'ready'}
-                                    onClick={() => setSelected('new')}
-                                >
-                                    <Plus size={17} />
-                                    New task
-                                </button>
-                            )}
+                                {auth.user.role === 'Administrator' && (
+                                    <button
+                                        className="button primary"
+                                        disabled={workspace.status !== 'ready'}
+                                        onClick={() => setSelected('new')}
+                                    >
+                                        <Plus size={17} />
+                                        New task
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                     {auth.error && (
                         <div className="error" role="alert">
                             {auth.error}
@@ -233,7 +253,19 @@ export default function App() {
                     ) : (
                         <Routes>
                             <Route path="/tasks" element={<TasksPage onOpen={setSelected} />} />
-                            <Route path="/tasks/:taskId" element={<TasksPage onOpen={setSelected} />} />
+                            <Route path="/tasks/:taskId" element={selected ? (
+                                <TaskPage
+                                    key={selected}
+                                    id={selected}
+                                    initialStatus={location.state?.initialStatus || null}
+                                    onClose={() => setSelected(null)}
+                                    onEditingChange={setTaskEditing}
+                                    onSaved={(message) => {
+                                        setToast(message);
+                                        dispatch(loadWorkspace());
+                                    }}
+                                />
+                            ) : <Navigate to="/tasks" replace />} />
                             <Route path="/dashboard" element={<Dashboard onOpen={setSelected} />} />
                             <Route path="/projects" element={<ProjectsPage />} />
                             <Route path="/notifications" element={<NotificationsPage />} />
@@ -247,18 +279,6 @@ export default function App() {
                     )}
                 </main>
             </div>
-            {selected && workspace.hasLoaded && (
-                <TaskDrawer
-                    key={selected}
-                    id={selected}
-                    onClose={() => setSelected(null)}
-                    onSaved={(message) => {
-                        setSelected(null);
-                        setToast(message);
-                        dispatch(loadWorkspace());
-                    }}
-                />
-            )}
             {toast && (
                 <div className="toast" role="status">
                     ✓ {toast}

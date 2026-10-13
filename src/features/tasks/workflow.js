@@ -1,3 +1,6 @@
+export const disciplines = ['Development', 'Drafting'];
+export const reviewStatuses = ['Ready for Review', 'In Review', 'Ready for Re-Review'];
+
 export const statuses = [
     'Backlog',
     'To Do',
@@ -76,19 +79,114 @@ export function statusTone(status) {
     return status === 'Cancelled' ? 'gray' : 'blue';
 }
 
-export function filterTasks(tasks, filters, userId) {
-    const query = filters.search.trim().toLowerCase();
+export function filterTasks(tasks, filters, userId, people = [], today = new Date()) {
+    const query = (filters.search || '').trim().toLowerCase();
+    const names = new Map(people.map((person) => [person.id, person.name]));
+    const participantIds = new Set(people.filter((person) => userId && person.userId === userId).map((person) => person.id));
+    if (userId && !people.some((person) => Object.hasOwn(person, 'userId'))) {
+        participantIds.add(userId);
+    }
     return tasks.filter((task) => {
+        const searchable = [task.code, task.title, task.description, task.projectName || 'General',
+            task.assigneeName || names.get(task.assigneeId), task.reviewerName || names.get(task.reviewerId),
+            task.releaseOwnerName || names.get(task.releaseOwnerId)].filter(Boolean).join(' ').toLowerCase();
+        const quickViewMatches = {
+            'my-work': participantIds.has(task.assigneeId),
+            review: participantIds.has(task.reviewerId) && reviewStatuses.includes(task.status),
+            releases: participantIds.has(task.releaseOwnerId),
+            created: task.createdById === userId,
+            overdue: isOverdue(task, today),
+        };
         return (
-            (!query ||
-                `${task.code} ${task.title} ${task.projectName || 'General'}`
-                    .toLowerCase()
-                    .includes(query)) &&
+            (!query || searchable.includes(query)) &&
             (!filters.status || task.status === filters.status) &&
             (!filters.discipline || task.discipline === filters.discipline) &&
             (!filters.projectId || task.projectId === filters.projectId) &&
-            (!filters.mine || task.assigneeId === userId)
+            (!filters.mine || participantIds.has(task.assigneeId)) &&
+            (!filters.quickView || quickViewMatches[filters.quickView] === true)
         );
+    });
+}
+
+export function staffOptionLabel(person) {
+    const fullName = [person.firstName, person.lastName]
+        .map((part) => (part || '').trim())
+        .filter(Boolean)
+        .join(', ');
+    const name = fullName || person.name;
+    const email = (person.email || '').trim();
+    const label = email ? `${name} <${email}>` : name;
+    if (!person.isActive) {
+        return `${label} (legacy account — choose staff)`;
+    }
+    return label;
+}
+
+export function getProjectContributors(tasks, projectId) {
+    const contributors = new Map();
+    const roles = [
+        ['originalAssigneeId', 'Original assignee', 'dev'],
+        ['assigneeId', 'Current owner', 'owner'],
+        ['reviewerId', 'Reviewer / QA', 'qa'],
+        ['releaseOwnerId', 'Release owner', 'release'],
+    ];
+
+    for (const task of tasks) {
+        if (task.projectId !== projectId) {
+            continue;
+        }
+        for (const [field, description, tone] of roles) {
+            const id = task[field];
+            if (!id) {
+                continue;
+            }
+            if (!contributors.has(id)) {
+                contributors.set(id, { id, key: id, tone, roles: [], fallbackName: null });
+            }
+            const contributor = contributors.get(id);
+            if (!contributor.roles.includes(description)) {
+                contributor.roles.push(description);
+            }
+            if (id === task.assigneeId && task.assigneeName) {
+                contributor.fallbackName = task.assigneeName;
+            }
+        }
+    }
+
+    return [...contributors.values()].map(({ roles: assignedRoles, ...contributor }) => ({
+        ...contributor,
+        description: assignedRoles.join(' · '),
+    }));
+}
+
+export function sortTasks(tasks, sort = 'updatedAtUtc', direction = 'desc') {
+    const priorities = { Low: 1, Medium: 2, High: 3, Urgent: 4 };
+    const sign = direction === 'asc' ? 1 : -1;
+    return [...tasks].sort((left, right) => {
+        let first = left[sort];
+        let second = right[sort];
+        if (sort === 'priority') {
+            first = priorities[left.priority];
+            second = priorities[right.priority];
+        }
+        // Missing values stay last in either direction; ties have a stable identity order.
+        if (first == null || first === '') {
+            return second == null || second === '' ? left.id.localeCompare(right.id) : 1;
+        }
+        if (second == null || second === '') {
+            return -1;
+        }
+        let comparison;
+        if (sort === 'title') {
+            comparison = String(first).localeCompare(String(second), undefined, { sensitivity: 'base', numeric: true });
+        }
+        else if (sort === 'priority') {
+            comparison = first - second;
+        }
+        else {
+            comparison = new Date(first).getTime() - new Date(second).getTime();
+        }
+        return (comparison || 0) * sign || left.id.localeCompare(right.id);
     });
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { request } from '../../app/api';
 import { loadWorkspace } from '../../app/store';
 
@@ -8,6 +8,7 @@ export default function NotificationsPage() {
     const { items, unreadCount } = useSelector((state) => state.workspace.notifications);
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(null);
 
@@ -19,7 +20,7 @@ export default function NotificationsPage() {
                 await request(`/notifications/${notification.id}/read`, { method: 'POST' });
                 dispatch(loadWorkspace());
             }
-            navigate(`/tasks/${notification.taskId}`);
+            navigate({ pathname: `/tasks/${notification.taskId}`, search: location.search });
         }
         catch (failure) {
             setError(failure.message);
