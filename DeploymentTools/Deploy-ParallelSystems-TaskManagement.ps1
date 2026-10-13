@@ -12,6 +12,7 @@ $projectDirectory = Split-Path $PSScriptRoot -Parent
 $deploymentDirectory = Join-Path (Split-Path $projectDirectory -Parent) 'Deployment'
 $zipPath = Join-Path $deploymentDirectory 'ParallelSystems.Web.TaskManagement.zip'
 $temporaryZip = Join-Path $env:TEMP ("ParallelSystems.Web.TaskManagement-{0}.zip" -f [guid]::NewGuid())
+$publicResponse = Join-Path $env:TEMP ("ParallelSystems.Web.TaskManagement-{0}.html" -f [guid]::NewGuid())
 $stamp = '{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), ([guid]::NewGuid().ToString('N').Substring(0, 8))
 $remotePrefix = "/home/ubuntu/ParallelSystems.Web.TaskManagement.$stamp"
 $remoteZip = "$remotePrefix.zip"
@@ -30,6 +31,22 @@ function Invoke-NativeCommand {
     & $Command @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "$FailureMessage (exit code $LASTEXITCODE)."
+    }
+}
+
+function Assert-TaskManagementShell {
+    param(
+        [Parameter(Mandatory)] [string] $ExpectedPath,
+        [Parameter(Mandatory)] [string] $ResponsePath
+    )
+
+    if (-not (Test-Path -LiteralPath $ResponsePath -PathType Leaf)) {
+        throw 'The public website check did not produce a Task Management page.'
+    }
+    $expectedHash = (Get-FileHash -LiteralPath $ExpectedPath -Algorithm SHA256).Hash
+    $responseHash = (Get-FileHash -LiteralPath $ResponsePath -Algorithm SHA256).Hash
+    if ($responseHash -ne $expectedHash) {
+        throw 'The public URL did not return the uploaded Task Management page. Check its Nginx include; the response may be the Timesheet fallback.'
     }
 }
 
@@ -158,12 +175,17 @@ try {
     # Validated origins/hosts and generated paths are safe as single-quoted Bash arguments.
     # Both tools modify the same vhost; also respect the unchanged Receipts tool's lock.
     $remotePipeline = "sed 's/\r$//' '$remoteScript' | sudo flock --nonblock /var/lock/parallel-systems-task-management.deploy.lock flock --nonblock /var/lock/parallel-systems-receipts.deploy.lock bash -s -- '$remoteZip' '$remoteHelper' '$remoteSnippet' '$origin' '$siteHost' '$stamp' '$skip' '$archiveHash'"
-    $remoteCommand = 'bash -o pipefail -c "' + $remotePipeline + '"'
+    # Windows PowerShell strips nested native-command quotes. Encode the wrapper,
+    # including pipefail, so ssh.exe receives one command without nested quotes.
+    $remoteBootstrap = "set -Eeuo pipefail`n$remotePipeline`n"
+    $encodedRemoteBootstrap = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteBootstrap))
+    $remoteCommand = "echo $encodedRemoteBootstrap | base64 -d | bash"
     Invoke-NativeCommand 'ssh.exe' @('-i', $KeyPath, $Server, $remoteCommand) 'EC2 deployment/checks failed (review rollback output)'
 
     Write-Host '[5/5] Checking website accessibility from this computer...' -ForegroundColor Cyan
     Invoke-NativeCommand 'curl.exe' @('--fail', '--silent', '--show-error', '--location', '--max-time', '30',
-        '--header', "Host: $siteHost", '--output', 'NUL', $publicSiteUrl) 'Remote checks passed, but the public website check failed'
+        '--header', "Host: $siteHost", '--output', $publicResponse, $publicSiteUrl) 'Remote checks passed, but the public website check failed'
+    Assert-TaskManagementShell -ExpectedPath (Join-Path $distDirectory 'index.html') -ResponsePath $publicResponse
     Write-Host 'DEPLOYMENT SUCCEEDED' -ForegroundColor Green
     Write-Host "Website: $publicSiteUrl"
     Write-Host "Commit: $commit"
@@ -174,6 +196,9 @@ catch {
     exit 1
 }
 finally {
+    if (Test-Path -LiteralPath $publicResponse -PathType Leaf) {
+        Remove-Item -LiteralPath $publicResponse -Force
+    }
     if (Test-Path -LiteralPath $temporaryZip -PathType Leaf) {
         Remove-Item -LiteralPath $temporaryZip -Force
     }

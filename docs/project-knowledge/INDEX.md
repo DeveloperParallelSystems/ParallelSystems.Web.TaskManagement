@@ -1,6 +1,6 @@
 # Project knowledge index
 
-Last verified: 2026-10-13 (Office document attachments and task-specific upload proxy; earlier checks retain their dates below)
+Last verified: 2026-10-13 (deployment SSH transport and public HTML validation; earlier checks retain their dates below)
 Evidence: `src/main.jsx`, `src/App.jsx`, `src/features/tasks/TaskPage.jsx`, `src/features/tasks/TaskDiscussion.jsx`, `src/features/tasks/commentMentions.js`, `src/features/tasks/discussionState.js`, `src/features/tasks/taskNavigation.js`, `src/app/store.js`, `src/app/api.js`, `src/features/tasks/TasksPage.jsx`, `src/features/tasks/taskQuery.js`, `src/features/tasks/taskActions.js`, `src/features/tasks/taskCsv.js`, `src/styles.css`, `tests/`, `DeploymentTools/`
 
 ## System purpose
@@ -47,6 +47,8 @@ Task planning, assignment, review, and delivery for staff, using existing Parall
 - Backend contract and database authority: `ParallelSystems.Server/docs/project-knowledge/TASK_MANAGEMENT.md` in the sibling server repository.
 
 ## Verification
+
+Deployment transport correction (2026-10-13): user output showed `sed` usage followed by false success. Public read-only checks returned Timesheet HTML for `/task-management/`; SSH inspection found no Task Management current release or Nginx include. The shared API was healthy and `/api/task-management/auth/me` returned the expected anonymous 401. Local tests reproduced Windows PowerShell splitting the nested SSH command. The launcher now encodes a Bash wrapper with `set -Eeuo pipefail` and requires the public HTML to match the built index SHA-256 before reporting success. 36 Python/Bash checks and 42 Node tests passed. Read-only real SSH probes verified output and exit-code preservation; no live deployment/reload/API restart was performed. Earlier transport tests below emitted command text without exercising native argument serialization, so they did not catch this bug. Evidence: `DeploymentTools/Deploy-ParallelSystems-TaskManagement.ps1`, `DeploymentTools/tests/test_deployment.py`, `tests/deployment.test.js`, deployment README. Commit the fix and re-run the frontend launcher to install the site.
 
 Office attachments (2026-10-13): 41 Node tests, frontend production build, isolated API Release build and 358 disposable SQL/HTTP assertions passed. Coverage includes all six doc/docx/xls/xlsx/ppt/pptx extensions, metadata/download bytes/types, removal and rejected renamed files, wrong Office package types, mismatched MIME and malformed/missing manifests. Test files/database were removed by the runner. No new dependencies, application API restart or deployment. Browser layout and real S3 were not reverified for this extension. Evidence: `attachmentValidation.js`, `TaskAttachments.jsx`, `tests/attachments.test.js`, sibling Server `OfficeAttachmentValidation.cs`, `WorkTaskAttachmentService.cs`, `TaskAttachmentStorage.cs`, `AttachmentChecks.cs`. NuGet vulnerability data remained unavailable (NU1900).
 

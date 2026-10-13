@@ -3,6 +3,8 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
+import sys
+import json
 import unittest
 
 from test_nginx import temporary_fixture
@@ -123,17 +125,18 @@ systemctl() {
 
 @unittest.skipUnless(os.name == 'nt', 'Tests the Windows-built SSH command.')
 class RemoteCommandChecks(unittest.TestCase):
-    def run_remote_command(self, missing_script=False):
+    def run_remote_command(self, missing_script=False, script_exit=0, sed_failure=False):
         launcher = (Path(__file__).parents[1] / 'Deploy-ParallelSystems-TaskManagement.ps1').read_text()
-        assignments = '\n'.join(line.strip() for line in launcher.splitlines()
-                                if line.strip().startswith(('$remotePipeline =', '$remoteCommand =')))
+        assignments = launcher[launcher.index('    $remotePipeline ='):launcher.index("    Invoke-NativeCommand 'ssh.exe'")]
         with temporary_fixture('task-command-') as folder:
             root = Path(folder)
             script = root / 'helper.sh'
-            script.write_bytes(b'printf \'%s|%s\\n\' "$1" "$8"\r\n')
+            script.write_bytes(b'printf \'%s|%s\\n\' "$1" "$8"\r\n' + f'exit {script_exit}\r\n'.encode())
             if missing_script:
                 script.unlink()
             script_path = '/c' + script.as_posix()[2:]
+            capture = root / 'capture_remote.py'
+            capture.write_text('import json, sys\nprint(json.dumps(sys.argv[1:]))\n')
             command_source = f"""
 $remoteScript = '{script_path}'
 $remoteZip = 'task.zip'
@@ -145,13 +148,18 @@ $stamp = '20261012-120000-12345678'
 $skip = '0'
 $archiveHash = '{'a' * 64}'
 {assignments}
-$remoteCommand
+# Exercise Windows PowerShell's native argument serialization, as ssh.exe does.
+& '{sys.executable}' '{capture}' '-i' 'fixture-key' 'ubuntu@example.com' $remoteCommand
 """
+            powershell_script = root / 'capture.ps1'
+            powershell_script.write_text(command_source)
             built = subprocess.run(
-                ['powershell.exe', '-NoProfile', '-Command', command_source],
+                ['powershell.exe', '-NoProfile', '-File', str(powershell_script)],
                 capture_output=True, text=True, timeout=15,
             )
             self.assertEqual(built.returncode, 0, built.stderr)
+            native_arguments = json.loads(built.stdout)
+            self.assertEqual(native_arguments[:-1], ['-i', 'fixture-key', 'ubuntu@example.com'])
             # Remove only command prefixes. The actual emitted quoting/pipeline is used.
             harness = '''
 export PATH="/usr/bin:/bin:$PATH"
@@ -164,7 +172,9 @@ flock() {
 }
 export -f sudo flock
 '''
-            return run_bash(harness + built.stdout.strip(), [], folder)
+            if sed_failure:
+                harness += 'sed() { return 9; }\nexport -f sed\n'
+            return run_bash(harness + native_arguments[-1], [], folder)
 
     def test_generated_command_preserves_arguments_and_normalizes_crlf(self):
         result = self.run_remote_command()
@@ -175,6 +185,14 @@ export -f sudo flock
         result = self.run_remote_command(missing_script=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('No such file', result.stderr)
+
+    def test_remote_script_failure_is_propagated(self):
+        result = self.run_remote_command(script_exit=7)
+        self.assertEqual(result.returncode, 7, result.stderr)
+
+    def test_failed_script_reader_is_propagated_even_when_bash_receives_empty_input(self):
+        result = self.run_remote_command(sed_failure=True)
+        self.assertEqual(result.returncode, 9, result.stderr)
 
 
 if __name__ == '__main__':

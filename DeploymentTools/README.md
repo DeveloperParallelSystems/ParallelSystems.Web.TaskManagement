@@ -36,6 +36,12 @@ the sibling `Deployment/ParallelSystems.Web.TaskManagement.zip`. Source files,
 environment files, credentials and `node_modules` are excluded. Small deployment
 helpers are uploaded separately. The archive SHA-256 is checked before extraction.
 
+The SSH command uses a Base64-encoded Bash wrapper to preserve quoting through
+Windows PowerShell's native argument handling. The decoded wrapper enables
+`set -Eeuo pipefail`, so a missing script, failed CRLF reader or remote deployment
+failure stops the launcher. Older versions could print `sed` help and incorrectly
+report success without installing the release; commit this fix before retrying.
+
 For overrides, run from this folder:
 
 ```powershell
@@ -116,7 +122,8 @@ On the first deployment, only the newly installed current symlink and configurat
 changes are removed. Failed releases and backups remain for inspection.
 Rollback failures explicitly print `ROLLBACK NEEDS ATTENTION`.
 
-A final accessibility check runs from Windows. Failure of this Windows-only check
+A final check runs from Windows and compares the returned HTML SHA-256 with the
+exact local build. HTTP 200 from a Timesheet fallback is rejected. Failure of this Windows-only check
 after successful EC2 validation does not roll back the active release. Old releases,
 backups and timestamped uploads remain available; no automatic pruning occurs.
 
@@ -180,3 +187,12 @@ No third-party Python packages or new application dependencies are required.
 
 Actual Nginx syntax, permissions, SSH connectivity and deployed URLs are verified
 only during an explicitly authorized EC2 deployment.
+
+SSH transport correction (2026-10-13): 36 local deployment checks and 42 Node tests
+passed, including the actual Windows PowerShell native argument boundary,
+CRLF/argument preservation, missing script and upstream/remote failure exits,
+and rejected Timesheet/missing public HTML. Read-only SSH probes on EC2 verified
+the new wrapper's successful output and preserved exit code 7. The production
+Task Management route still served Timesheet before this fix; no frontend release
+or Task Management Nginx include was installed. This fix was not deployed and
+does not restart the API. Re-run the launcher after committing the changes.
