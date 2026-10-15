@@ -4,10 +4,13 @@ export function canMoveTask(details, status, administrator) {
     if (!details?.task || status === details.task.status || !details.allowedStatuses?.includes(status)) {
         return false;
     }
-    if (!administrator && (status === 'Cancelled' || ['Completed', 'Cancelled'].includes(details.task.status))) {
-        return false;
+    if (details.liveStatuses) {
+        return true;
     }
-    return true;
+    if (details.task.workflow) {
+        return Boolean(details.allowedTransitions?.some((action) => action.toStageId === status));
+    }
+    return administrator || status !== 'Cancelled' && !['Completed', 'Cancelled'].includes(details.task.status);
 }
 
 export function needsReviewNote(status) {
@@ -22,6 +25,12 @@ export function taskInput(task, changes = {}) {
         assigneeId: task.assigneeId || null, reviewerId: task.reviewerId || null,
         releaseOwnerId: task.releaseOwnerId || null, version: task.version, note: '', ...changes,
     };
+    if (Object.hasOwn(task, 'workflowVersionId')) {
+        input.workflowVersionId = task.workflowVersionId;
+    }
+    if (Object.hasOwn(task, 'liveStatusMode')) {
+        input.liveStatusMode = task.liveStatusMode;
+    }
     if (input.status !== task.status) {
         input.assigneeId = suggestAssignee(input, input.status) || null;
     }

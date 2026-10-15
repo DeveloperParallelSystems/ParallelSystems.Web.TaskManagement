@@ -2,15 +2,24 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, FolderOpen } from 'lucide-react';
 import { Stats, TaskCard } from './TasksPage';
-import { getProjectContributors, groups, isOverdue, reviewStatuses } from './workflow';
+import { getProjectContributors, isOverdue } from './workflow';
+import { taskKind, workflowBoards } from './taskWorkflow';
+import { selectPresentationGroups } from './workflowPresentation';
 import { defaultTaskQuery, serializeTaskQuery } from './taskQuery';
 import { ContributorAvatars } from './TaskContributors';
 
 export function Dashboard({ onOpen }) {
+    const groups = useSelector(selectPresentationGroups);
     const { tasks, people } = useSelector((state) => state.workspace);
+    const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
+    const disciplineWorkflows = useSelector((state) => state.workspace.disciplineWorkflows?.data?.items);
     const overdue = tasks.filter((task) => isOverdue(task));
-    const blocked = tasks.filter((task) => ['Blocked', 'Failed Review'].includes(task.status));
-    const waiting = tasks.filter((task) => reviewStatuses.includes(task.status));
+    const blocked = tasks.filter((task) => !task.workflow && ['Blocked', 'Failed Review'].includes(task.status));
+    const waiting = tasks.filter((task) => taskKind(task) === 'Review');
+    const summaries = workflowBoards(tasks, groups, {
+        statusSettings,
+        workflows: (disciplineWorkflows || []).map((item) => item.active).filter(Boolean),
+    })[0]?.groups || [];
     const overdueByPerson = Object.values(overdue.reduce((counts, task) => {
         const key = task.assigneeId || 'unassigned';
         counts[key] ||= { id: key, name: task.assigneeName || 'Unassigned', count: 0 };
@@ -27,10 +36,11 @@ export function Dashboard({ onOpen }) {
                         <span className="muted">Your visible tasks</span>
                     </div>
                     <div className="progress-list">
-                        {groups.map((group) => {
-                            const count = tasks.filter((task) => group.statuses.includes(task.status)).length;
+                        {!summaries.length && <p role="status">Board layout is unavailable or still loading. Task totals remain available.</p>}
+                        {summaries.map((group) => {
+                            const count = group.tasks.length;
                             return (
-                                <div className="progress-row" key={group.name}>
+                                <div className="progress-row" key={group.id}>
                                     <div>
                                         <span>{group.name}</span>
                                         <strong>{count}</strong>
@@ -53,7 +63,7 @@ export function Dashboard({ onOpen }) {
                         <strong>{overdue.length}</strong>
                         <span>overdue tasks</span>
                         <strong>{blocked.length}</strong>
-                        <span>blocked or returned for corrections</span>
+                        <span>legacy tasks blocked or returned for corrections</span>
                         <strong>{waiting.length}</strong>
                         <span>waiting on review</span>
                     </div>
@@ -88,7 +98,7 @@ export function Dashboard({ onOpen }) {
 }
 
 export function ProjectCard({ project, tasks, people, onOpen }) {
-    const completed = tasks.filter((task) => task.status === 'Completed').length;
+    const completed = tasks.filter((task) => taskKind(task) === 'Completed').length;
     const contributors = getProjectContributors(tasks, project.id);
 
     return (

@@ -68,7 +68,7 @@ export default function BulkTaskActions({ selected, onClear, onOpen }) {
                     </button>
                 </form>
             )}
-            {taskCount > 0 && <p className="bulk-help">Updates are saved for each task. Any issues will appear here.</p>}
+            {taskCount > 0 && <p className="bulk-help">Updates are saved for each task. Status changes preserve the current owner. Any issues will appear here.</p>}
             {bulkResults.length > 0 && (
                 <div role="status" className="bulk-results">
                     <strong>{bulkResults.filter((result) => result.success).length} of {bulkResults.length} updated</strong>

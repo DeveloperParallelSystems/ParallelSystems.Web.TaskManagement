@@ -3,10 +3,19 @@ import { request, setSessionExpiredHandler } from './api.js';
 import { canMoveTask, needsReviewNote, taskInput } from '../features/tasks/taskActions.js';
 import { addDiscussionReducers } from '../features/tasks/discussionState.js';
 import { addAttachmentReducers } from '../features/tasks/attachmentState.js';
+import { addChecklistReducers, reconcileChecklists } from '../features/tasks/checklistState.js';
+import { addLabelReducers, reconcileLabelMutations } from '../features/tasks/labelState.js';
+import { addDependencyReducers, reconcileDependencies } from '../features/tasks/dependencyState.js';
+import { addPresentationReducers, emptyPresentation } from '../features/tasks/workflowPresentation.js';
+import { addDisciplineWorkflowReducers, emptyDisciplineWorkflows } from '../features/tasks/disciplineWorkflows.js';
+import { addTaskTransitionReducers } from '../features/tasks/taskTransitions.js';
+import { addStatusSettingsReducers, emptyStatusSettings } from '../features/tasks/liveStatuses.js';
 
-export const loadTaskDetail = createAsyncThunk('workspace/detail', async ({ id }, { rejectWithValue, signal }) => {
+export const loadTaskDetail = createAsyncThunk('workspace/detail', async ({ id }, { rejectWithValue, signal, getState }) => {
     try {
-        return await request(`/tasks/${id}`, { signal });
+        const statusSettingsVersion = getState().workspace.statusSettings?.data?.version;
+        const detail = await request(`/tasks/${id}`, { signal });
+        return { ...detail, statusSettingsVersion };
     }
     catch (error) {
         return rejectWithValue({ message: error.message, status: error.status });
@@ -16,10 +25,12 @@ export const loadTaskDetail = createAsyncThunk('workspace/detail', async ({ id }
 export const moveTask = createAsyncThunk('workspace/move', async ({ id, status, details }, { dispatch, getState, rejectWithValue }) => {
     try {
         const administrator = getState().auth.user?.role === 'Administrator';
-        if (!canMoveTask(details, status, administrator) || needsReviewNote(status)) {
-            return rejectWithValue({ message: 'Open task details to make this workflow change.' });
+        if (!canMoveTask(details, status, administrator)) {
+            return rejectWithValue({ message: 'This status is not available for the task.' });
         }
-        return await dispatch(saveTask({ id, values: taskInput(details.task, { status }) })).unwrap();
+        return await request(`/tasks/${id}/status`, {
+            method: 'PUT', body: { status, version: details.task.version, note: '' },
+        });
     }
     catch (error) {
         return rejectWithValue(error);
@@ -45,7 +56,18 @@ export const bulkUpdateTasks = createAsyncThunk('workspace/bulk', async ({ tasks
                 continue;
             }
             // Never overwrite other fields with a partial list record.
-            await dispatch(saveTask({ id: target.id, values: taskInput(details.task, changes) })).unwrap();
+            const statusChanged = changes.status && changes.status !== details.task.status;
+            if (statusChanged) {
+                await request(`/tasks/${target.id}/status`, {
+                    method: 'PUT', body: { status: changes.status, version: details.task.version, note: '' },
+                });
+            }
+            const remaining = { ...changes };
+            delete remaining.status;
+            if (Object.keys(remaining).length > 0) {
+                const latest = statusChanged ? await dispatch(loadTaskDetail({ id: target.id })).unwrap() : details;
+                await dispatch(saveTask({ id: target.id, values: taskInput(latest.task, remaining) })).unwrap();
+            }
             results.push({ id: target.id, code: target.code, success: true, message: 'Updated.' });
         }
         catch (error) {
@@ -164,9 +186,10 @@ export const loadWorkspace = createAsyncThunk('workspace/load', async (_, { sign
 
 export const saveTask = createAsyncThunk('workspace/save', async ({ id, values }, { rejectWithValue }) => {
     try {
-        return await request(id ? `/tasks/${id}` : '/tasks', {
+        const { liveStatusMode, ...body } = values;
+        return await request(id ? `/tasks/${id}/live` : '/tasks/live', {
             method: id ? 'PUT' : 'POST',
-            body: values,
+            body,
         });
     }
     catch (error) {
@@ -184,9 +207,16 @@ export const createProject = createAsyncThunk('workspace/createProject', async (
 });
 
 const emptyWorkspace = {
+    statusSettings: emptyStatusSettings,
+    disciplineWorkflows: emptyDisciplineWorkflows,
+    taskTransitions: {},
+    workflowPresentation: emptyPresentation,
     tasks: [],
     people: [],
     projects: [],
+    labels: [],
+    labelMutations: {},
+    dependencies: {},
     notifications: { items: [], unreadCount: 0 },
     status: 'idle',
     error: null,
@@ -195,6 +225,7 @@ const emptyWorkspace = {
     details: {},
     discussions: {},
     attachments: {},
+    checklists: {},
     detailRequests: {},
     bulkRequestId: null,
     bulkBusy: false,
@@ -228,14 +259,24 @@ const workspaceSlice = createSlice({
                 const previous = previousPeople.get(person.id);
                 return !previous || previous.userId !== person.userId || previous.accountIsActive !== person.accountIsActive;
             });
+            const previousTasks = state.tasks;
             Object.assign(state, action.payload);
+            reconcileChecklists(state, previousTasks, bindingsChanged);
+            reconcileLabelMutations(state, bindingsChanged);
+            reconcileDependencies(state, previousTasks, bindingsChanged);
             if (bindingsChanged) {
+                state.taskTransitions = {};
                 state.details = {};
                 state.detailRequests = {};
                 state.discussions = {};
                 state.attachments = {};
             }
             state.status = 'ready';
+            for (const id of Object.keys(state.taskTransitions)) {
+                if (!state.tasks.some((task) => task.id === id)) {
+                    delete state.taskTransitions[id];
+                }
+            }
             state.hasLoaded = true;
             for (const id of Object.keys(state.discussions)) {
                 if (!state.tasks.some((task) => task.id === id)) {
@@ -302,6 +343,13 @@ const workspaceSlice = createSlice({
         });
         addDiscussionReducers(builder);
         addAttachmentReducers(builder);
+        addChecklistReducers(builder);
+        addLabelReducers(builder);
+        addDependencyReducers(builder);
+        addPresentationReducers(builder);
+        addDisciplineWorkflowReducers(builder);
+        addTaskTransitionReducers(builder);
+        addStatusSettingsReducers(builder);
         builder.addCase(logout.fulfilled, () => emptyWorkspace);
         builder.addCase(authSlice.actions.sessionExpired, () => emptyWorkspace);
         builder.addCase(login.fulfilled, () => emptyWorkspace);

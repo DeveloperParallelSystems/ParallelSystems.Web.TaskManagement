@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CheckSquare2, FolderOpen, FolderPlus, LayoutDashboard, LogOut, Plus, RefreshCw } from 'lucide-react';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, CalendarDays, CheckSquare2, Columns3, FolderOpen, FolderPlus, GitBranch, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Tags, X } from 'lucide-react';
 import { checkSession, loadWorkspace, logout } from './app/store';
 import LoginPage from './features/auth/LoginPage';
 import TaskPage from './features/tasks/TaskPage';
@@ -9,10 +9,33 @@ import { taskIdFromPath } from './features/tasks/taskNavigation';
 import ProjectDialog from './features/projects/ProjectDialog';
 import NotificationsPage from './features/tasks/NotificationsPage';
 import TasksPage from './features/tasks/TasksPage';
+import LabelsPage from './features/tasks/LabelsPage';
+import WorkflowPresentationPage from './features/tasks/WorkflowPresentationPage';
+import { loadPresentation } from './features/tasks/workflowPresentation';
+import StatusSettingsPage from './features/tasks/StatusSettingsPage';
+import StatusCatalogPage from './features/tasks/StatusCatalogPage';
+import { loadStatusSettings } from './features/tasks/liveStatuses';
 import { Dashboard, ProjectsPage } from './features/tasks/OverviewPages';
 import { initials } from './features/tasks/workflow';
+import { defaultTaskQuery, serializeTaskQuery } from './features/tasks/taskQuery';
 
 const pages = {
+    '/status-catalog': {
+        title: 'Status catalog',
+        description: 'Manage shared status names.',
+    },
+    '/discipline-statuses': {
+        title: 'Discipline statuses',
+        description: 'Choose the available statuses for Development and Drafting.',
+    },
+    '/board-presentation': {
+        title: 'Board presentation',
+        description: 'Arrange columns while preserving the shared task workflow.',
+    },
+    '/labels': {
+        title: 'Labels',
+        description: 'Organize tasks with shared label names and colors.',
+    },
     '/tasks': {
         title: 'Task Management',
         description: 'Plan, assign, review, and deliver work across teams.',
@@ -38,6 +61,9 @@ export default function App() {
     const [taskEditing, setTaskEditing] = useState({ dirty: false, saving: false });
     const [creatingProject, setCreatingProject] = useState(false);
     const [toast, setToast] = useState('');
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [workspaceSearch, setWorkspaceSearch] = useState('');
+    const workspaceSearchRef = useRef(null);
     const location = useLocation();
     const navigate = useNavigate();
     const selected = taskIdFromPath(location.pathname);
@@ -70,8 +96,12 @@ export default function App() {
             return;
         }
         dispatch(loadWorkspace());
+        dispatch(loadPresentation());
+        dispatch(loadStatusSettings());
         const refresh = () => {
             dispatch(loadWorkspace());
+            dispatch(loadPresentation());
+            dispatch(loadStatusSettings());
         };
         window.addEventListener('focus', refresh);
         const timer = window.setInterval(() => {
@@ -108,6 +138,22 @@ export default function App() {
         };
     }, [toast]);
 
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [location.pathname, location.search]);
+
+    useEffect(() => {
+        function focusWorkspaceSearch(event) {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' &&
+                !document.querySelector('dialog[open]') && auth.user) {
+                event.preventDefault();
+                workspaceSearchRef.current?.focus();
+            }
+        }
+        window.addEventListener('keydown', focusWorkspaceSearch);
+        return () => window.removeEventListener('keydown', focusWorkspaceSearch);
+    }, [auth.user]);
+
     if (auth.status === 'checking') {
         return <main className="loading-screen">Opening your workspace…</main>;
     }
@@ -126,6 +172,8 @@ export default function App() {
         return <LoginPage />;
     }
 
+    const calendarActive = location.pathname === '/tasks' && new URLSearchParams(location.search).get('view') === 'calendar';
+
     return (
         <div className="app-shell">
             <aside className="sidebar">
@@ -135,8 +183,12 @@ export default function App() {
                         <strong>Parallel Systems</strong>
                         <small>Workspace</small>
                     </div>
+                    <button type="button" className="icon-button mobile-menu-toggle" aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
+                        aria-expanded={mobileMenuOpen} aria-controls="workspace-navigation" onClick={() => setMobileMenuOpen((open) => !open)}>
+                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                    </button>
                 </div>
-                <div className="sidebar-navigation">
+                <div id="workspace-navigation" className={`sidebar-navigation${mobileMenuOpen ? ' is-open' : ''}`}>
                     <div className="nav-label">WORKSPACE</div>
                     <nav aria-label="Workspace">
                         <NavLink to="/dashboard">
@@ -159,9 +211,19 @@ export default function App() {
                             )}
                         </NavLink>
                     </nav>
-                    <div className="sidebar-footer">
-                        PARALLEL SYSTEMS<span>Task Management</span>
-                    </div>
+                    {auth.user.role === 'Administrator' && <>
+                        <div className="nav-label nav-section-label">ADMINISTRATION</div>
+                        <nav aria-label="Administration">
+                            <NavLink to="/labels"><Tags size={18} />Labels</NavLink>
+                            <NavLink to="/board-presentation"><Columns3 size={18} />Board presentation</NavLink>
+                            <NavLink to="/status-catalog"><Tags size={18} />Status catalog</NavLink>
+                            <NavLink to="/discipline-statuses"><GitBranch size={18} />Discipline statuses</NavLink>
+                        </nav>
+                    </>}
+                </div>
+                <div className="sidebar-profile">
+                    <span className="avatar">{initials(auth.user.name)}</span>
+                    <div><strong>{auth.user.name}</strong><small>{auth.user.role}</small></div>
                 </div>
             </aside>
             <div className="main">
@@ -170,12 +232,16 @@ export default function App() {
                         Workspace <span>/</span>
                         <strong>{breadcrumbTitle}</strong>
                     </div>
+                    <form className="workspace-search" role="search" aria-label="Workspace task search" onSubmit={(event) => {
+                        event.preventDefault();
+                        navigate({ pathname: '/tasks', search: serializeTaskQuery({ ...defaultTaskQuery, search: workspaceSearch.trim() }) });
+                    }}>
+                        <Search size={16} aria-hidden="true" />
+                        <input ref={workspaceSearchRef} type="search" aria-label="Search workspace tasks" placeholder="Search tasks, projects or people"
+                            value={workspaceSearch} onChange={(event) => setWorkspaceSearch(event.target.value)} />
+                        <button type="submit" aria-label="Find tasks" title="Find tasks"><kbd>↵</kbd></button>
+                    </form>
                     <div className="account">
-                        <span className="avatar">{initials(auth.user.name)}</span>
-                        <div>
-                            <strong>{auth.user.name}</strong>
-                            <small>{auth.user.role}</small>
-                        </div>
                         <button
                             className="icon-button"
                             aria-label="Sign out"
@@ -192,7 +258,17 @@ export default function App() {
                     </div>
                 </header>
                 <main className="content">
-                    {!selected && (
+                    {workspace.workflowPresentation.error && location.pathname !== '/board-presentation' && (
+                        <div className="error" role="alert">
+                            Could not refresh board presentation. Showing the last loaded layout when available.
+                            <button type="button" className="text-button" onClick={() => dispatch(loadPresentation())}>Retry layout</button>
+                        </div>
+                    )}
+                    {workspace.statusSettings?.error && !['/discipline-statuses', '/status-catalog'].includes(location.pathname) && <div className="error" role="alert">
+                        Could not refresh discipline statuses. Reload them before changing task status.
+                        <button type="button" className="text-button" onClick={() => dispatch(loadStatusSettings())}>Retry statuses</button>
+                    </div>}
+                    {!selected && !['/labels', '/board-presentation', '/discipline-statuses', '/status-catalog'].includes(location.pathname) && (
                         <div className="page-heading">
                             <div>
                                 <span className="eyebrow">YOUR WORKSPACE</span>
@@ -213,7 +289,11 @@ export default function App() {
                                 <button
                                     className="button"
                                     disabled={workspace.status === 'loading'}
-                                    onClick={() => dispatch(loadWorkspace())}
+                                    onClick={() => {
+                                        dispatch(loadWorkspace());
+                                        dispatch(loadPresentation());
+                                        dispatch(loadStatusSettings());
+                                    }}
                                 >
                                     <RefreshCw size={15} />
                                     <span>Refresh</span>
@@ -252,6 +332,15 @@ export default function App() {
                         </div>
                     ) : (
                         <Routes>
+                            <Route path="/discipline-workflows" element={<Navigate to="/discipline-statuses" replace />} />
+                            <Route path="/status-catalog" element={auth.user.role === 'Administrator'
+                                ? <StatusCatalogPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
+                            <Route path="/discipline-statuses" element={auth.user.role === 'Administrator'
+                                ? <StatusSettingsPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
+                            <Route path="/board-presentation" element={auth.user.role === 'Administrator'
+                                ? <WorkflowPresentationPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
+                            <Route path="/labels" element={auth.user.role === 'Administrator'
+                                ? <LabelsPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
                             <Route path="/tasks" element={<TasksPage onOpen={setSelected} />} />
                             <Route path="/tasks/:taskId" element={selected ? (
                                 <TaskPage
@@ -279,6 +368,14 @@ export default function App() {
                     )}
                 </main>
             </div>
+            <nav className="mobile-bottom-nav" aria-label="Mobile workspace">
+                <Link to="/tasks" aria-current={location.pathname.startsWith('/tasks') && !calendarActive ? 'page' : undefined}
+                    className={location.pathname.startsWith('/tasks') && !calendarActive ? 'active' : ''}><CheckSquare2 size={20} /><span>Tasks</span></Link>
+                <Link to="/tasks?view=calendar" aria-current={calendarActive ? 'page' : undefined}
+                    className={calendarActive ? 'active' : ''}><CalendarDays size={20} /><span>Calendar</span></Link>
+                <NavLink to="/projects"><FolderOpen size={20} /><span>Projects</span></NavLink>
+                <NavLink to="/notifications"><Bell size={20} /><span>Notifications{workspace.notifications.unreadCount > 0 ? ` (${workspace.notifications.unreadCount})` : ''}</span></NavLink>
+            </nav>
             {toast && (
                 <div className="toast" role="status">
                     ✓ {toast}

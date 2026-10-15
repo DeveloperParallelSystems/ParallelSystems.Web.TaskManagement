@@ -1,0 +1,198 @@
+.discipline-workflows-management {
+    padding: 24px;
+}
+
+.discipline-workflows-management > h2 {
+    margin-top: 0;
+}
+
+.discipline-selector {
+    max-width: 320px;
+    margin: 20px 0;
+}
+
+.discipline-workflow-editor {
+    min-width: 0;
+    padding: 0;
+    margin: 20px 0;
+    border: 0;
+}
+
+.discipline-workflow-editor > h3 {
+    margin-top: 28px;
+}
+
+.discipline-stage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.discipline-stage,
+.discipline-action {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface, #fff);
+}
+
+.discipline-stage {
+    border-top: 3px solid var(--workflow-stage-color, #6b7280);
+}
+
+.discipline-stage.blue {
+    --workflow-stage-color: #3985db;
+}
+
+.discipline-stage.amber {
+    --workflow-stage-color: #c48a23;
+}
+
+.discipline-stage.purple {
+    --workflow-stage-color: #9367d7;
+}
+
+.discipline-stage.green {
+    --workflow-stage-color: #34916c;
+}
+
+.discipline-stage.red {
+    --workflow-stage-color: #c45151;
+}
+
+.discipline-stage.gray {
+    --workflow-stage-color: #6b7280;
+}
+
+.discipline-stage .column-heading i {
+    background: var(--workflow-stage-color);
+}
+
+.discipline-stage .column-heading,
+.discipline-action .column-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.discipline-stage code,
+.discipline-action code {
+    color: var(--muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.discipline-stage .form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    margin-top: 12px;
+}
+
+.discipline-action-list {
+    display: grid;
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.discipline-workflow-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0 8px;
+}
+
+.discipline-workflow-actions .button {
+    white-space: normal;
+}
+
+.discipline-role-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    margin: 16px 0 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+
+.discipline-role-options legend {
+    padding: 0 6px;
+}
+
+.discipline-role-options label,
+.discipline-note-option {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.discipline-role-options input,
+.discipline-note-option input {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.discipline-active-version,
+.discipline-draft-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.discipline-draft-heading h3 {
+    margin: 0;
+}
+
+.discipline-validation {
+    margin: 16px 0;
+}
+
+.discipline-validation summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.discipline-workflow-preview {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.discipline-preview-current {
+    display: grid;
+    gap: 6px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #f4f6f2;
+}
+
+.discipline-preview-edges {
+    display: grid;
+    gap: 12px;
+    padding-left: 18px;
+    overflow-wrap: anywhere;
+}
+
+.discipline-preview-edges span {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+@media (max-width: 760px) {
+    .discipline-workflows-management {
+        padding: 16px;
+    }
+
+    .discipline-action > .form-grid {
+        grid-template-columns: 1fr;
+    }
+}

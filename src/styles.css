@@ -9,6 +9,403 @@
     --line: #dfe6dd;
     --shell-header-height: 80px;
 }
+
+.calendar-planning {
+    display: grid;
+    gap: 24px;
+    min-width: 0;
+}
+
+.workflow-board-section {
+    margin-top: 24px;
+    min-width: 0;
+}
+
+.task-workflow-actions {
+    margin-top: 20px;
+}
+
+.calendar-panel {
+    min-width: 0;
+}
+
+.calendar-toolbar,
+.calendar-navigation {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.calendar-toolbar {
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.calendar-toolbar h2 {
+    margin: 0 0 6px;
+}
+
+.calendar-navigation .field {
+    width: auto;
+}
+.calendar-navigation {
+    align-items: flex-end;
+}
+.calendar-navigation .button,
+.calendar-navigation .icon-button,
+.calendar-navigation input {
+    min-height: 44px;
+}
+.calendar-navigation .icon-button {
+    min-width: 44px;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 5px;
+}
+
+.calendar-weekdays {
+    color: #53634f;
+    font-size: 11px;
+    font-weight: 650;
+    padding: 10px 0;
+    text-align: center;
+}
+
+.calendar-day {
+    min-width: 0;
+    min-height: 125px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 6px;
+    background: #fff;
+}
+
+.calendar-day.outside-month {
+    background: #f4f6f2;
+    border-style: dashed;
+}
+
+.calendar-day.is-today {
+    border: 2px solid var(--green);
+}
+
+.calendar-day h3 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    font-size: 12px;
+    margin: 0 0 8px;
+}
+
+.calendar-day-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.calendar-today-label {
+    color: var(--green);
+    font-size: 10px;
+}
+
+.calendar-day ul,
+.planning-section ul {
+    display: grid;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.calendar-task {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    padding: 9px 7px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #fff;
+    color: #25342e;
+    text-align: left;
+    overflow-wrap: anywhere;
+    font-size: 11px;
+}
+
+.calendar-task:hover {
+    background: #f0f5ec;
+    border-color: #8dac78;
+}
+
+.calendar-task:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+}
+
+.calendar-task.is-overdue {
+    border-left: 3px solid #a44941;
+}
+
+.calendar-task.is-closed {
+    border-style: dashed;
+    background: #f4f6f2;
+}
+
+.calendar-task small,
+.calendar-task-project,
+.calendar-task-owner {
+    color: #53634f;
+    font-size: 10px;
+}
+
+.calendar-task .badge {
+    white-space: normal;
+    font-size: 10px;
+}
+
+.planning-sections {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.planning-section {
+    min-width: 0;
+}
+
+.planning-section h3 {
+    margin-top: 0;
+}
+
+@media (max-width: 760px) {
+    .calendar-weekdays,
+    .calendar-day-number,
+    .calendar-day.is-empty:not(.is-today) {
+        display: none;
+    }
+
+    .calendar-grid,
+    .planning-sections {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .calendar-day {
+        min-height: 0;
+        padding: 12px;
+    }
+
+    .calendar-day-label {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+        white-space: normal;
+    }
+}
+.task-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+}
+.task-label {
+    display: inline-block;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.task-label-panel {
+    margin-top: 20px;
+}
+.task-dependencies {
+    margin-top: 20px;
+}
+.dependency-list {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 20px;
+}
+.dependency-list li {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+}
+.dependency-list a {
+    flex: 1;
+    min-width: 180px;
+    color: var(--navy);
+    overflow-wrap: anywhere;
+}
+.dependency-form {
+    max-width: 720px;
+}
+.dependency-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+@media (max-width: 600px) {
+    .dependency-list li {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .dependency-actions .button {
+        width: 100%;
+    }
+}
+.label-options,
+.label-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+    min-width: 0;
+}
+.label-options legend,
+.label-filter legend {
+    color: var(--muted);
+    font-size: 12px;
+    padding: 0 5px;
+}
+.label-options .checkbox,
+.label-filter .checkbox {
+    min-width: 0;
+    max-width: 100%;
+}
+.label-options input,
+.label-filter input {
+    flex: 0 0 auto;
+}
+.label-actions,
+.label-definition-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0;
+}
+.label-management form {
+    max-width: 720px;
+}
+.label-management input[type="color"] {
+    min-height: 42px;
+    width: 100%;
+}
+.label-definition-list .button {
+    max-width: 100%;
+    white-space: normal;
+}
+@media (max-width: 600px) {
+    .label-management .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .label-actions .button {
+        width: 100%;
+    }
+}
+.task-checklist {
+    margin-top: 20px;
+}
+.checklist-progress {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--green);
+    margin-bottom: 14px;
+    font-size: 13px;
+}
+.checklist-progress progress {
+    width: 120px;
+    max-width: 100%;
+    height: 6px;
+    accent-color: var(--green);
+}
+.checklist-progress.compact {
+    margin: 12px 0 0;
+    font-size: 12px;
+}
+.checklist-progress.compact progress {
+    width: 60px;
+}
+.checklist-items {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+}
+.checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+}
+.checklist-item-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+.checklist-item-label span {
+    overflow-wrap: anywhere;
+}
+.checklist-item-label input {
+    flex: 0 0 auto;
+    margin-top: 3px;
+    accent-color: var(--green);
+}
+.checklist-item.completed .checklist-item-label span {
+    text-decoration: line-through;
+    color: var(--muted);
+}
+.checklist-item-actions,
+.checklist-editor-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.checklist-item-actions .button {
+    padding: 8px;
+}
+.checklist-editor {
+    display: grid;
+    gap: 10px;
+}
+@media (max-width: 600px) {
+    .checklist-item {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .task-checklist .panel-heading {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+}
 * {
     box-sizing: border-box;
 }
@@ -26,8 +423,9 @@ button, a, input, select, textarea {
 button {
     cursor: pointer;
 }
-button:disabled {
-    cursor: wait;
+button:disabled,
+button[aria-disabled="true"] {
+    cursor: not-allowed;
     opacity: .6;
 }
 input, select, textarea {
@@ -268,7 +666,7 @@ h1 {
     font-weight: 600;
     white-space: nowrap;
 }
-.button:hover {
+.button:not(:disabled):not([aria-disabled="true"]):hover {
     border-color: #9eaf95;
 }
 .button.primary {
@@ -277,7 +675,7 @@ h1 {
     color: #fff;
     box-shadow: 0 3px 8px #3d6b3015;
 }
-.button.primary:hover {
+.button.primary:not(:disabled):not([aria-disabled="true"]):hover {
     background: #315b26;
 }
 .icon-button {
@@ -289,7 +687,7 @@ h1 {
     border-radius: 5px;
     padding: 8px;
 }
-.icon-button:hover {
+.icon-button:not(:disabled):not([aria-disabled="true"]):hover {
     background: #f0f4ec;
 }
 .stats {
@@ -420,7 +818,7 @@ input[type="checkbox"] {
 }
 .board {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--board-columns, 4), minmax(0, 1fr));
     gap: 14px;
     align-items: start;
 }
@@ -432,6 +830,59 @@ input[type="checkbox"] {
     border-radius: 10px;
     min-height: 280px;
 }
+
+.presentation-editor {
+    border: 0;
+    padding: 0;
+    margin: 20px 0;
+    min-width: 0;
+}
+
+.presentation-column {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    min-width: 0;
+}
+
+.presentation-column h3 {
+    overflow-wrap: anywhere;
+}
+
+.presentation-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.presentation-statuses {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+}
+
+.presentation-statuses li {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) minmax(140px, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    border-top: 1px solid var(--line);
+    padding: 8px 0;
+}
+
+.presentation-statuses .field {
+    min-width: 0;
+}
+
+@media (max-width: 640px) {
+    .presentation-statuses li {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+    }
+}
 .column-heading {
     display: flex;
     align-items: center;
@@ -439,6 +890,8 @@ input[type="checkbox"] {
     padding: 0 4px 13px;
 }
 .column-heading h2 {
+    overflow-wrap: anywhere;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 7px;
@@ -871,7 +1324,8 @@ th {
     padding: 24px;
     min-width: 0;
 }
-.task-attachments .sr-only {
+.task-attachments .sr-only,
+.presentation-editor .sr-only {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1182,6 +1636,20 @@ th {
     padding: 0;
     min-width: 0;
 }
+.form-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+}
+.form-grid > .form-actions {
+    grid-column: 1 / -1;
+    margin-top: 0;
+}
+.form-actions > .button {
+    min-height: 44px;
+}
 .field {
     display: flex;
     flex-direction: column;
@@ -1251,6 +1719,8 @@ th {
 }
 .drawer-footer {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 9px;
     padding: 16px 28px;
@@ -1655,7 +2125,7 @@ progress::-webkit-progress-value {
     border-left: 3px solid #16a34a;
 }
 
-.notification-item:hover {
+.notification-item:not(:disabled):hover {
     background: #f1f5f9;
 }
 

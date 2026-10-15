@@ -1,3 +1,5 @@
+import { taskStatusName } from './taskWorkflow.js';
+
 function csvCell(value) {
     let text = String(value ?? '');
     // CSV is opened in spreadsheets: prevent user text from becoming a formula.
@@ -13,7 +15,7 @@ export function taskCsv(tasks, people = []) {
     for (const task of tasks) {
         rows.push([
             task.code, task.title, task.description, task.projectName || 'General', task.discipline,
-            task.status, task.priority, task.assigneeName || names.get(task.assigneeId) || '',
+            taskStatusName(task), task.priority, task.assigneeName || names.get(task.assigneeId) || '',
             task.reviewerName || names.get(task.reviewerId) || '',
             task.releaseOwnerName || names.get(task.releaseOwnerId) || '',
             task.dueDate?.slice(0, 10) || '', task.updatedAtUtc,

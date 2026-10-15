@@ -15,6 +15,8 @@ export async function request(path, { method = 'GET', body, signal, notifyExpire
             Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-Task-Management': '1',
+            'X-Task-Workflow': '1',
+            'X-Live-Statuses': '1',
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,

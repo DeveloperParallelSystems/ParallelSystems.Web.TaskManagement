@@ -1,8 +1,11 @@
 import { disciplines, statuses } from './workflow.js';
+import { validMonth } from './calendar.js';
 
 export const quickViews = [
     ['', 'All visible work'],
     ['my-work', 'My work'],
+    ['my-open', 'My open work'],
+    ['due-week', 'Due this week'],
     ['review', 'Needs my review'],
     ['releases', 'My releases'],
     ['created', 'Created by me'],
@@ -10,12 +13,13 @@ export const quickViews = [
 ];
 export const sortOptions = [['dueDate', 'Due date'], ['priority', 'Priority'], ['updatedAtUtc', 'Last updated'], ['title', 'Title']];
 export const defaultTaskQuery = {
-    search: '', discipline: '', status: '', projectId: '', mine: false,
-    quickView: '', sort: 'updatedAtUtc', direction: 'desc', view: 'board',
+    search: '', discipline: '', status: '', projectId: '', mine: false, labelIds: [],
+    quickView: '', sort: 'updatedAtUtc', direction: 'desc', view: 'board', assigneeId: '', month: '',
 };
 const keys = {
     search: 'q', discipline: 'discipline', status: 'status', projectId: 'project',
     mine: 'mine', quickView: 'quick', sort: 'sort', direction: 'dir', view: 'view',
+    assigneeId: 'assignee', month: 'month',
 };
 
 export function parseTaskQuery(query) {
@@ -27,10 +31,20 @@ export function parseTaskQuery(query) {
         }
     }
     state.mine = params.get('mine') === '1';
+    state.assigneeId = state.assigneeId.toLowerCase();
+    if (state.assigneeId !== 'unassigned' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(state.assigneeId)) {
+        state.assigneeId = '';
+    }
+    if (!validMonth(state.month)) {
+        state.month = '';
+    }
+    state.labelIds = [...new Set((params.get('label') || '').toLowerCase().split(',')
+        .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)))];
     if (!disciplines.includes(state.discipline)) {
         state.discipline = '';
     }
-    if (!statuses.includes(state.status)) {
+    if (!statuses.includes(state.status) && !/^status:[^\r\n]{1,30}$/.test(state.status) &&
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[a-z0-9-]{1,30}$/.test(state.status)) {
         state.status = '';
     }
     if (!quickViews.some(([value]) => value === state.quickView)) {
@@ -42,7 +56,7 @@ export function parseTaskQuery(query) {
     if (!['asc', 'desc'].includes(state.direction)) {
         state.direction = defaultTaskQuery.direction;
     }
-    if (!['board', 'list'].includes(state.view)) {
+    if (!['board', 'list', 'calendar'].includes(state.view)) {
         state.view = defaultTaskQuery.view;
     }
     return state;
@@ -50,6 +64,10 @@ export function parseTaskQuery(query) {
 
 export function serializeTaskQuery(state, existing = '') {
     const params = new URLSearchParams(existing);
+    params.delete('label');
+    if (state.labelIds?.length) {
+        params.set('label', state.labelIds.join(','));
+    }
     for (const [name, key] of Object.entries(keys)) {
         params.delete(key);
         const value = state[name];

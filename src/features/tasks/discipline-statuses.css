@@ -1,0 +1,54 @@
+.discipline-status-management .presentation-statuses li {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.discipline-status-management .presentation-statuses strong {
+    grid-column: 1;
+    font-size: 14px;
+}
+
+.discipline-status-management .status-usage {
+    color: #647a58;
+    font-size: 12px;
+}
+
+.discipline-status-management .presentation-icon-actions {
+    grid-column: 3;
+}
+
+.discipline-status-management .status-catalog-choices {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.status-settings-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.status-settings-actions .button {
+    min-height: 44px;
+}
+
+@media (max-width: 640px) {
+    .status-settings-actions .button {
+        flex: 1 1 160px;
+    }
+
+    .discipline-status-management .presentation-statuses li {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .discipline-status-management .status-usage {
+        grid-column: 1;
+    }
+
+    .discipline-status-management .presentation-icon-actions {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+    }
+}

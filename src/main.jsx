@@ -5,6 +5,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { store } from './app/store';
 import App from './App';
 import './styles.css';
+import './workspace-design.css';
 
 const router = createBrowserRouter(
     [{ path: '*', element: <App /> }],

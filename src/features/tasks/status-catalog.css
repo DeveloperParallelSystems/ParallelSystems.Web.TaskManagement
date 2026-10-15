@@ -1,0 +1,118 @@
+.status-catalog-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.status-catalog-heading h2 {
+    margin: 0 0 8px;
+}
+
+.status-catalog-heading .button {
+    flex-shrink: 0;
+}
+
+.status-catalog-editor {
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border, #dfe5dc);
+    border-radius: 12px;
+    background: #f5f7f2;
+}
+
+.status-catalog-editor h3 {
+    margin-top: 0;
+}
+
+.status-catalog-editor .field {
+    max-width: 480px;
+}
+
+.status-catalog-scroll {
+    position: relative;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.status-catalog-table .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.status-catalog-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.status-catalog-table th,
+.status-catalog-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border, #dfe5dc);
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.status-catalog-table thead th {
+    background: #f5f7f2;
+    color: #52634e;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-catalog-table tbody th {
+    background: transparent;
+    color: #294139;
+    font-size: 14px;
+    min-width: 130px;
+    white-space: normal;
+}
+
+.status-catalog-table small {
+    display: block;
+    max-width: 310px;
+    margin-top: 6px;
+    color: #6d7b70;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.status-catalog-usage {
+    color: #6d7b70;
+    font-size: 13px;
+}
+
+.status-catalog-usage.in-use {
+    color: #3d6b30;
+    font-weight: 600;
+}
+
+.status-catalog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+@media (max-width: 640px) {
+    .status-catalog-heading {
+        flex-direction: column;
+    }
+
+    .status-catalog-table {
+        min-width: 580px;
+    }
+
+    .status-catalog-table th,
+    .status-catalog-table td {
+        padding: 12px;
+    }
+}

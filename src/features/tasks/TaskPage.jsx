@@ -4,12 +4,20 @@ import { useBlocker, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Clock3, RotateCcw, Link } from 'lucide-react';
 import { request } from '../../app/api';
 import { saveTask } from '../../app/store';
-import { changeTaskField, disciplines, staffOptionLabel } from './workflow';
-import { needsReviewNote } from './taskActions';
+import { disciplines, staffOptionLabel } from './workflow';
+import { taskInput } from './taskActions';
+import { taskStatusName, taskStatusTone } from './taskWorkflow';
+import TaskStatusControl from './TaskStatusControl';
+import { loadStatusSettings } from './liveStatuses.js';
+import './task-detail-design.css';
 import { shouldBlockTaskNavigation } from './taskNavigation';
 import TaskDiscussion from './TaskDiscussion';
 import TaskPageTabs from './TaskPageTabs';
 import TaskAttachments from './TaskAttachments';
+import TaskChecklist from './TaskChecklist';
+import TaskLabels from './TaskLabels';
+import TaskDependencies from './TaskDependencies';
+import { mergeDependencyVersion } from './dependencyState.js';
 
 const emptyTask = {
     title: '',
@@ -18,7 +26,7 @@ const emptyTask = {
     projectId: '',
     priority: 'Medium',
     dueDate: '',
-    status: 'Backlog',
+    status: 'To Do',
     originalAssigneeId: '',
     assigneeId: '',
     reviewerId: '',
@@ -27,9 +35,11 @@ const emptyTask = {
     version: 0,
 };
 
-export default function TaskPage({ id, initialStatus = null, onClose, onSaved, onEditingChange }) {
+export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
     const dispatch = useDispatch();
     const { people, projects } = useSelector((state) => state.workspace);
+    const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
+    const statusSettingsError = useSelector((state) => state.workspace.statusSettings?.error);
     const administrator = useSelector((state) => state.auth.user.role === 'Administrator');
     const headingRef = useRef(null);
     const confirmRef = useRef(null);
@@ -46,12 +56,17 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
     const [createdId, setCreatedId] = useState(null);
     const [discussionEditing, setDiscussionEditing] = useState({ dirty: false, saving: false });
     const [attachmentEditing, setAttachmentEditing] = useState({ dirty: false, saving: false });
+    const [checklistEditing, setChecklistEditing] = useState({ dirty: false, saving: false });
+    const [labelEditing, setLabelEditing] = useState({ dirty: false, saving: false });
+    const [dependencyEditing, setDependencyEditing] = useState({ dirty: false, saving: false });
     const historyRequest = useRef(null);
     const [activeTab, setActiveTab] = useState('details');
-    const unsaved = dirty || discussionEditing.dirty || attachmentEditing.dirty;
-    const pendingSave = saving || discussionEditing.saving || attachmentEditing.saving;
+    const [workflowEditing, setWorkflowEditing] = useState({ dirty: false, saving: false });
+    const [newWorkflowReady, setNewWorkflowReady] = useState(false);
+    const unsaved = dirty || discussionEditing.dirty || attachmentEditing.dirty || checklistEditing.dirty || labelEditing.dirty || dependencyEditing.dirty || workflowEditing.dirty;
+    const pendingSave = saving || discussionEditing.saving || attachmentEditing.saving || checklistEditing.saving || labelEditing.saving || dependencyEditing.saving || workflowEditing.saving;
     const editable = id === 'new' ? administrator : details?.canEditDetails;
-    const allowedStatuses = id === 'new' ? ['Backlog', 'To Do'] : details?.allowedStatuses || [];
+    const allowedStatuses = id === 'new' ? ['To Do'] : details?.allowedStatuses || [];
     let saveMessage = id === 'new' ? 'Not saved yet' : 'Task details saved';
     if (dirty) {
         saveMessage = 'Unsaved changes';
@@ -59,6 +74,14 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
     const blocker = useBlocker(({ currentLocation, nextLocation }) =>
         shouldBlockTaskNavigation({ dirty: unsaved, saving: pendingSave }, currentLocation, nextLocation),
     );
+
+    useEffect(() => {
+        if (id !== 'new' || newWorkflowReady || !statusSettings) {
+            return;
+        }
+        setValues((current) => ({ ...current, workflow: null, workflowVersionId: null, status: 'To Do' }));
+        setNewWorkflowReady(true);
+    }, [id, values.discipline, newWorkflowReady, statusSettings]);
 
     useEffect(() => {
         if (id !== 'new') {
@@ -137,9 +160,8 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
                     reviewerId: result.task.reviewerId || '',
                     releaseOwnerId: result.task.releaseOwnerId || '',
                 };
-                const applyIntent = reload === 0 && initialStatus && result.allowedStatuses.includes(initialStatus);
-                setValues(applyIntent ? changeTaskField(loaded, 'status', initialStatus) : loaded);
-                setDirty(Boolean(applyIntent));
+                setValues(loaded);
+                setDirty(false);
                 setLoading(false);
             })
             .catch((failure) => {
@@ -151,11 +173,39 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
         return () => {
             controller.abort();
         };
-    }, [id, reload, initialStatus]);
+    }, [id, reload]);
+
+    useEffect(() => {
+        if (id === 'new' || !statusSettings?.version) {
+            return;
+        }
+        const controller = new AbortController();
+        request('/tasks/' + id, { signal: controller.signal }).then((fresh) => {
+            // Refresh permissions without overwriting unsaved task or panel drafts.
+            setDetails((current) => current && current.task.version === fresh.task.version ? {
+                ...current, allowedStatuses: fresh.allowedStatuses, liveStatuses: fresh.liveStatuses,
+                canEditDetails: fresh.canEditDetails,
+            } : current);
+        }).catch((failure) => {
+            if (failure.name !== 'AbortError') {
+                setError({ message: failure.message, status: failure.status });
+            }
+        });
+        return () => controller.abort();
+    }, [id, statusSettings?.version]);
 
     function change(name, value) {
         setDirty(true);
-        setValues((current) => changeTaskField(current, name, value));
+        if (id === 'new' && name === 'discipline') {
+            setNewWorkflowReady(false);
+        }
+        setValues((current) => {
+            const next = { ...current, [name]: value };
+            if (name === 'originalAssigneeId' && !current.assigneeId) {
+                next.assigneeId = value;
+            }
+            return next;
+        });
     }
 
     async function refreshHistory() {
@@ -168,7 +218,7 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
         }
         catch (failure) {
             if (!controller.signal.aborted) {
-                setError({ message: `The file change was saved, but History could not refresh: ${failure.message}` });
+                setError({ message: `The change was saved, but History could not refresh: ${failure.message}` });
                 if (failure.status === 404) {
                     setDetails(null);
                 }
@@ -195,6 +245,16 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
         onClose();
     }
 
+    function reloadTask() {
+        if (pendingSave) {
+            return;
+        }
+        if (!(dirty || labelEditing.dirty || dependencyEditing.dirty || workflowEditing.dirty) ||
+            window.confirm('Reload the latest task and discard unsaved task, action, label and dependency changes?')) {
+            setReload((value) => value + 1);
+        }
+    }
+
     function keepEditing() {
         confirmRef.current?.close();
         blocker.reset();
@@ -202,9 +262,12 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
 
     async function submit(event) {
         event.preventDefault();
+        if (workflowEditing.dirty || workflowEditing.saving || labelEditing.dirty || labelEditing.saving || dependencyEditing.dirty || dependencyEditing.saving || (id === 'new' && !newWorkflowReady)) {
+            return;
+        }
         setError(null);
         setSaving(true);
-        const payload = { ...values };
+        const payload = taskInput(values, { note: values.note });
         for (const field of ['projectId', 'assigneeId', 'reviewerId', 'releaseOwnerId', 'dueDate']) {
             payload[field] = payload[field] || null;
         }
@@ -230,9 +293,9 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
         return (
             <label className="field">
                 <span>{label}</span>
-                <select
+                <select form="task-details-form"
                     value={values[name]}
-                    disabled={disabled || saving}
+                    disabled={disabled || saving || workflowEditing.saving}
                     required={name === 'originalAssigneeId'}
                     onChange={(event) => change(name, event.target.value)}
                 >
@@ -262,204 +325,226 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
     }
 
     return (
-        <section className="task-page" aria-labelledby="task-page-title">
+        <section className="task-page task-detail-design" aria-labelledby="task-page-title">
             <button type="button" className="text-button task-back" disabled={pendingSave} onClick={close}>
                 <ArrowLeft size={16} /> Back to tasks
             </button>
             <div className="task-page-heading">
                 <div className="task-page-title">
-                    <span className="eyebrow">{details?.task.code || (id === 'new' ? 'NEW TASK' : 'TASK')}</span>
+                    <div className="task-detail-meta">
+                        <span className="eyebrow">{details?.task.code || (id === 'new' ? 'NEW TASK' : 'TASK')}</span>
+                        {details && <>
+                            <span className={`badge ${taskStatusTone(details.task)}`}>{taskStatusName(details.task)}</span>
+                            <span className={`task-detail-priority priority-${details.task.priority?.toLowerCase()}`}>
+                                {details.task.priority} priority
+                            </span>
+                        </>}
+                    </div>
                     <h1 id="task-page-title" ref={headingRef} tabIndex={-1}>
                         {id === 'new' ? 'Create task' : details?.task.title || 'Task details'}
                     </h1>
-                    {id !== 'new' && (
-                        <button type="button" className="text-button" onClick={copyLink}>
-                            <Link size={14} /> Copy task link
-                        </button>
-                    )}
                     {linkMessage && <p role="status">{linkMessage}</p>}
                 </div>
+                {id !== 'new' && (
+                    <button type="button" className="button task-copy-link" onClick={copyLink}>
+                        <Link size={15} /> Copy task link
+                    </button>
+                )}
+            </div>
+            <div className="task-detail-tabs">
                 <TaskPageTabs value={activeTab} onChange={setActiveTab} attachmentsDisabled={id === 'new'} />
             </div>
             <div id="task-details-panel" className="task-tab-panel" role="tabpanel"
                 aria-labelledby="task-details-tab" tabIndex={0} hidden={activeTab !== 'details'}>
-                {loading ? (
-                    <div className="empty">Loading task…</div>
-                ) : (
-                    <form onSubmit={submit} aria-busy={saving}>
-                        <div className="task-page-body">
-                            {error && (
-                                <div className="error" role="alert">
-                                    {error.message || 'Unable to save. Please try again.'}
-                                    {id !== 'new' && (
-                                        <button
-                                            type="button"
-                                            className="text-button"
-                                            onClick={() => {
-                                                if (
-                                                    !dirty ||
-                                                    window.confirm(
-                                                        'Reload the latest task and discard unsaved changes?',
-                                                    )
-                                                ) {
-                                                    setReload((value) => value + 1);
-                                                }
-                                            }}
-                                        >
-                                            <RotateCcw size={14} /> Reload latest task
-                                        </button>
+                <div className="task-detail-workspace">
+                    <div className="task-detail-main">
+                        {loading ? (
+                            <div className="empty">Loading task…</div>
+                        ) : (
+                            <form id="task-details-form" onSubmit={submit} aria-busy={saving}>
+                                <div className="task-page-body">
+                                    {error && (
+                                        <div className="error" role="alert">
+                                            {error.message || 'Unable to save. Please try again.'}
+                                            {id !== 'new' && (
+                                                <button
+                                                    type="button"
+                                                    className="text-button"
+                                                    disabled={pendingSave}
+                                                    onClick={reloadTask}
+                                                >
+                                                    <RotateCcw size={14} /> Reload latest task
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                    {(details || id === 'new') && (
+                                        <>
+                                            {!editable && (
+                                                <p className="hint">
+                                                    You can add notes and change the status when your assignment permits.
+                                                </p>
+                                            )}
+                                            <div className="task-page-columns">
+                                                <section className="panel task-details-panel" aria-labelledby="task-details-heading">
+                                                    <h2 id="task-details-heading">Task details</h2>
+                                                    <fieldset disabled={!editable || saving || labelEditing.saving || dependencyEditing.saving || workflowEditing.saving} className="form-grid">
+                                                        <p className="hint full">Assign staff from Staff Information. Staff without an account can be assigned now.</p>
+                                                        <label className="field full">
+                                                            <span>Task title</span>
+                                                            <input form="task-details-form"
+                                                                autoFocus={id === 'new'}
+                                                                required
+                                                                maxLength={130}
+                                                                value={values.title}
+                                                                onChange={(event) => change('title', event.target.value)}
+                                                                placeholder="What needs to be done?"
+                                                            />
+                                                        </label>
+                                                        <label className="field">
+                                                            <span>Discipline</span>
+                                                            <select form="task-details-form"
+                                                                value={values.discipline}
+                                                                disabled={id !== 'new' && Boolean(values.workflow)}
+                                                                onChange={(event) => change('discipline', event.target.value)}
+                                                            >
+                                                                {disciplines.map((discipline) => <option key={discipline}>{discipline}</option>)}
+                                                            </select>
+                                                        </label>
+                                                        <label className="field">
+                                                            <span>Project</span>
+                                                            <select form="task-details-form"
+                                                                value={values.projectId}
+                                                                onChange={(event) => change('projectId', event.target.value)}
+                                                            >
+                                                                <option value="">General · no project</option>
+                                                                {projects.map((project) => (
+                                                                    <option key={project.id} value={project.id}>
+                                                                        {project.name}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </label>
+                                                        <label className="field">
+                                                            <span>Priority</span>
+                                                            <select form="task-details-form"
+                                                                value={values.priority}
+                                                                onChange={(event) => change('priority', event.target.value)}
+                                                            >
+                                                                {['Low', 'Medium', 'High', 'Urgent'].map((priority) => (
+                                                                    <option key={priority}>{priority}</option>
+                                                                ))}
+                                                            </select>
+                                                        </label>
+                                                        <label className="field">
+                                                            <span>Due date</span>
+                                                            <input form="task-details-form"
+                                                                type="date"
+                                                                value={values.dueDate}
+                                                                onChange={(event) => change('dueDate', event.target.value)}
+                                                            />
+                                                        </label>
+                                                        {personSelect('originalAssigneeId', 'Original assignee')}
+                                                        {values.workflow?.definition.mode !== 'Simple' && personSelect('reviewerId', 'Reviewer / QA')}
+                                                        {values.workflow?.definition.mode !== 'Simple' && personSelect('releaseOwnerId', 'Release owner')}
+                                                        <label className="field full">
+                                                            <span>Description</span>
+                                                            <textarea form="task-details-form"
+                                                                rows={4}
+                                                                maxLength={10000}
+                                                                value={values.description}
+                                                                onChange={(event) =>
+                                                                    change('description', event.target.value)
+                                                                }
+                                                                placeholder="Describe the work and what a successful result looks like…"
+                                                            />
+                                                        </label>
+                                                    </fieldset>
+                                                </section>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
-                            )}
-                            {(details || id === 'new') && (
-                                <>
-                                    {!editable && (
-                                        <p className="hint">
-                                            You can add notes and update the workflow steps available to your
-                                            role on this task.
-                                        </p>
-                                    )}
-                                    <div className="task-page-columns">
-                                        <section className="panel task-details-panel" aria-labelledby="task-details-heading">
-                                            <h2 id="task-details-heading">Task details</h2>
-                                            <fieldset disabled={!editable || saving} className="form-grid">
-                                                <p className="hint full">Assign staff from Staff Information. Staff without an account can be assigned now.</p>
-                                                <label className="field full">
-                                                    <span>Task title</span>
-                                                    <input
-                                                        autoFocus={id === 'new'}
-                                                        required
-                                                        maxLength={130}
-                                                        value={values.title}
-                                                        onChange={(event) => change('title', event.target.value)}
-                                                        placeholder="What needs to be done?"
-                                                    />
-                                                </label>
-                                                <label className="field">
-                                                    <span>Discipline</span>
-                                                    <select
-                                                        value={values.discipline}
-                                                        onChange={(event) => change('discipline', event.target.value)}
-                                                    >
-                                                        {disciplines.map((discipline) => <option key={discipline}>{discipline}</option>)}
-                                                    </select>
-                                                </label>
-                                                <label className="field">
-                                                    <span>Project</span>
-                                                    <select
-                                                        value={values.projectId}
-                                                        onChange={(event) => change('projectId', event.target.value)}
-                                                    >
-                                                        <option value="">General · no project</option>
-                                                        {projects.map((project) => (
-                                                            <option key={project.id} value={project.id}>
-                                                                {project.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </label>
-                                                <label className="field">
-                                                    <span>Priority</span>
-                                                    <select
-                                                        value={values.priority}
-                                                        onChange={(event) => change('priority', event.target.value)}
-                                                    >
-                                                        {['Low', 'Medium', 'High', 'Urgent'].map((priority) => (
-                                                            <option key={priority}>{priority}</option>
-                                                        ))}
-                                                    </select>
-                                                </label>
-                                                <label className="field">
-                                                    <span>Due date</span>
-                                                    <input
-                                                        type="date"
-                                                        value={values.dueDate}
-                                                        onChange={(event) => change('dueDate', event.target.value)}
-                                                    />
-                                                </label>
-                                                {personSelect('originalAssigneeId', 'Original assignee')}
-                                                {personSelect('reviewerId', 'Reviewer / QA')}
-                                                {personSelect('releaseOwnerId', 'Release owner')}
-                                                <label className="field full">
-                                                    <span>Description</span>
-                                                    <textarea
-                                                        rows={4}
-                                                        maxLength={10000}
-                                                        value={values.description}
-                                                        onChange={(event) =>
-                                                            change('description', event.target.value)
-                                                        }
-                                                        placeholder="Describe the work and what a successful result looks like…"
-                                                    />
-                                                </label>
-                                            </fieldset>
-                                        </section>
-                                        <section className="panel task-workflow-panel" aria-labelledby="task-workflow-heading">
-                                            <h2 id="task-workflow-heading">Workflow</h2>
-                                            <div className="form-grid">
-                                                <label className="field">
-                                                    <span>Status</span>
-                                                    <select
-                                                        disabled={saving}
-                                                        value={values.status}
-                                                        onChange={(event) => change('status', event.target.value)}
-                                                    >
-                                                        {allowedStatuses.map((status) => (
-                                                            <option key={status}>{status}</option>
-                                                        ))}
-                                                    </select>
-                                                </label>
-                                                {personSelect(
-                                                    'assigneeId',
-                                                    'Assigned to · current owner',
-                                                    !editable || ['Completed', 'Cancelled'].includes(values.status),
-                                                )}
-                                                <p className="hint full">
-                                                    {values.status === 'Failed Review'
-                                                        ? 'Return the work to the original assignee and explain what needs correcting.'
-                                                        : 'Status changes suggest the next owner. Release steps are optional after approval.'}
-                                                </p>
-                                                <label className="field full">
-                                                    <span>Activity / review note</span>
-                                                    <textarea
-                                                        disabled={saving}
-                                                        rows={3}
-                                                        maxLength={4000}
-                                                        required={
-                                                            needsReviewNote(values.status) &&
-                                                            details?.task.status !== 'Failed Review'
-                                                        }
-                                                        value={values.note}
-                                                        onChange={(event) => change('note', event.target.value)}
-                                                        placeholder="Add an update, review result, or reason for the change…"
-                                                    />
-                                                </label>
-                                            </div>
-                                        </section>
+                                {(details || id === 'new') && (
+                                    <div className="task-page-footer">
+                                        <span className="muted" role="status">
+                                            {saveMessage}
+                                        </span>
+                                        <button type="button" className="button" disabled={pendingSave} onClick={close}>
+                                            Back to tasks
+                                        </button>
+                                        <button
+                                            className="button primary"
+                                            disabled={saving || workflowEditing.dirty || workflowEditing.saving || labelEditing.dirty || labelEditing.saving || dependencyEditing.dirty || dependencyEditing.saving || (!details && id !== 'new') || (id === 'new' && !newWorkflowReady)}
+                                        >
+                                            <Save size={16} />
+                                            {saving ? 'Saving…' : 'Save task'}
+                                        </button>
                                     </div>
-                                </>
-                            )}
-                        </div>
-                        {(details || id === 'new') && (
-                            <div className="task-page-footer">
-                                <span className="muted" role="status">
-                                    {saveMessage}
-                                </span>
-                                <button type="button" className="button" disabled={pendingSave} onClick={close}>
-                                    Back to tasks
-                                </button>
-                                <button
-                                    className="button primary"
-                                    disabled={saving || (!details && id !== 'new')}
-                                >
-                                    <Save size={16} />
-                                    {saving ? 'Saving…' : 'Save task'}
-                                </button>
-                            </div>
+                                )}
+                            </form>
                         )}
-                    </form>
-                )}
-                {id !== 'new' && <TaskDiscussion taskId={id} onEditingChange={setDiscussionEditing} />}
+                        {labelEditing.dirty && <p className="hint">Save or cancel label changes before saving task details.</p>}
+                        {dependencyEditing.dirty && <p className="hint">Add or cancel the dependency selection before saving task details or labels.</p>}
+                        {workflowEditing.dirty && <p className="hint">Apply or cancel the status change before saving task details, labels or dependencies.</p>}
+                        {id === 'new' && <section className="panel task-label-panel"><h2>Labels</h2>
+                            <p className="muted">Save this task to assign labels.</p></section>}
+                        {!loading && details && <TaskLabels key={`labels-${id}`} task={details.task}
+                            disabled={saving || dependencyEditing.dirty || dependencyEditing.saving || workflowEditing.dirty || workflowEditing.saving}
+                            onEditingChange={setLabelEditing} onFailure={setError}
+                            onSaved={(result, expectedVersion) => {
+                                setDetails((current) => current ? { ...current, task: { ...current.task, ...result } } : current);
+                                setValues((current) => current.version === expectedVersion ? { ...current, ...result } : current);
+                                refreshHistory();
+                            }} />}
+                        {id !== 'new' && <TaskDiscussion taskId={id} onEditingChange={setDiscussionEditing} />}
+                    </div>
+                    <aside className="task-detail-side" aria-label="Status and task planning">
+                        {!statusSettings && <section className="panel" role="status">
+                            <h2>Status choices unavailable</h2>
+                            <p>{statusSettingsError?.message || 'Loading the discipline’s statuses…'}</p>
+                            <button type="button" className="button" onClick={() => dispatch(loadStatusSettings())}>
+                                Reload statuses
+                            </button>
+                        </section>}
+                        {statusSettings && !loading && (details || id === 'new') && <TaskStatusControl
+                            task={details?.task || null} allowedStatuses={allowedStatuses} settings={statusSettings}
+                            disabled={dirty || saving || labelEditing.dirty || labelEditing.saving || dependencyEditing.dirty || dependencyEditing.saving}
+                            onEditingChange={setWorkflowEditing} onReload={reloadTask} onChanged={() => {
+                                setReload((value) => value + 1);
+                                onSaved('Task status changed.');
+                            }} />}
+                        {!loading && (details || id === 'new') && <section className="panel task-assignment-panel"
+                            aria-labelledby="task-assignment-heading">
+                            <h2 id="task-assignment-heading">Assignment and activity</h2>
+                            <div className="form-grid">
+                                {personSelect('assigneeId', 'Assigned to · current owner', !editable)}
+                                <label className="field full"><span>Activity note</span>
+                                    <textarea form="task-details-form" rows={3} maxLength={4000}
+                                        disabled={saving || workflowEditing.saving}
+                                        value={values.note} onChange={(event) => change('note', event.target.value)}
+                                        placeholder="Add an update…" />
+                                </label>
+                            </div>
+                        </section>}
+                        {id === 'new' && <section className="panel task-checklist"><h2>Checklist</h2>
+                            <p className="muted">Save this task to add checklist items.</p></section>}
+                        {id !== 'new' && <TaskChecklist
+                            key={JSON.stringify([id, people.map((person) => [person.id, person.userId, person.accountIsActive])])}
+                            taskId={id} onEditingChange={setChecklistEditing} onHistoryChange={refreshHistory} />}
+                        {id === 'new' && <section className="panel task-dependencies"><h2>Dependencies</h2>
+                            <p className="muted">Save this task to add dependencies.</p></section>}
+                        {!loading && details && <TaskDependencies key={`dependencies-${id}`} task={details.task}
+                            disabled={saving || labelEditing.dirty || labelEditing.saving || workflowEditing.dirty || workflowEditing.saving}
+                            onEditingChange={setDependencyEditing} onFailure={setError} onReloadTask={reloadTask}
+                            onSaved={(change, expectedVersion) => {
+                                setDetails((current) => current ? { ...current, task: mergeDependencyVersion(current.task, change, expectedVersion) } : current);
+                                setValues((current) => mergeDependencyVersion(current, change, expectedVersion));
+                                refreshHistory();
+                                onSaved('Task dependency updated.');
+                            }} />}
+                    </aside>
+                </div>
             </div>
             <div id="task-history-panel" className="task-tab-panel" role="tabpanel"
                 aria-labelledby="task-history-tab" tabIndex={0} hidden={activeTab !== 'history'}>
@@ -484,7 +569,7 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
                                     </div>
                                     <p>{activity.summary}</p>
                                     <small>
-                                        {activity.status} ·{' '}
+                                        {statusSettings?.catalog.find((item) => item.code === activity.status)?.name || taskStatusName({ ...details.task, status: activity.status, statusName: null })} ·{' '}
                                         {activity.assigneeName || 'Unassigned'}
                                     </small>
                                     {activity.note && <blockquote>{activity.note}</blockquote>}
@@ -523,7 +608,7 @@ export default function TaskPage({ id, initialStatus = null, onClose, onSaved, o
                         <h2 id="discard-task-title">{pendingSave ? 'Saving changes…' : 'Discard your unsaved changes?'}</h2>
                         <p id="discard-task-description">
                             {pendingSave ? 'Wait for the save to finish before leaving this task.' :
-                                'Your task edits, unposted comment draft and queued files will be lost if you leave this page.'}
+                                'Your task edits, status change, label and dependency selections, checklist draft, unposted comment draft and queued files will be lost if you leave this page.'}
                         </p>
                     </div>
                     <div className="drawer-footer">

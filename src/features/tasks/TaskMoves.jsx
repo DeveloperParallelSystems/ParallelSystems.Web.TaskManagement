@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { loadTaskDetail, loadWorkspace, moveTask } from '../../app/store.js';
-import { canMoveTask, needsReviewNote } from './taskActions.js';
-import { statuses } from './workflow.js';
+import { canMoveTask } from './taskActions.js';
+import { allowedDisciplineStatuses } from './liveStatuses.js';
 
-export function TaskMoveMenu({ task, onOpen, onError }) {
+export function TaskMoveMenu({ task, onError }) {
     const dispatch = useDispatch();
     const administrator = useSelector((state) => state.auth.user.role === 'Administrator');
     const cached = useSelector((state) => state.workspace.details[task.id]);
+    const settings = useSelector((state) => state.workspace.statusSettings?.data);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const details = cached?.task.version === task.version ? cached : null;
+    const details = cached && cached.task.version === task.version && cached.statusSettingsVersion === settings?.version ? cached : null;
 
     async function prepare() {
         if (details || loading) {
@@ -34,10 +35,6 @@ export function TaskMoveMenu({ task, onOpen, onError }) {
 
     async function move(status) {
         if (!canMoveTask(details, status, administrator)) {
-            return;
-        }
-        if (needsReviewNote(status)) {
-            onOpen(task.id, status);
             return;
         }
         setSaving(true);
@@ -64,9 +61,9 @@ export function TaskMoveMenu({ task, onOpen, onError }) {
             onChange={(event) => move(event.target.value)}
         >
             <option value="">{loading ? 'Loading permissions…' : saving ? 'Moving…' : 'Move to…'}</option>
-            {statuses.map((status) => (
-                <option key={status} value={status} disabled={!canMoveTask(details, status, administrator)}>
-                    {status}
+            {allowedDisciplineStatuses(settings, task.discipline).filter((item) => canMoveTask(details, item.code, administrator)).map((item) => (
+                <option key={item.code} value={item.code} disabled={!canMoveTask(details, item.code, administrator)}>
+                    {item.name}
                 </option>
             ))}
         </select>

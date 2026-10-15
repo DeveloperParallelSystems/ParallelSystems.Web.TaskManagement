@@ -1,3 +1,6 @@
+import { isTaskClosed, taskKind, taskStatusKey } from './taskWorkflow.js';
+import { deadlineKey, localDayKey } from './calendar.js';
+
 export const disciplines = ['Development', 'Drafting'];
 export const reviewStatuses = ['Ready for Review', 'In Review', 'Ready for Re-Review'];
 
@@ -81,6 +84,10 @@ export function statusTone(status) {
 
 export function filterTasks(tasks, filters, userId, people = [], today = new Date()) {
     const query = (filters.search || '').trim().toLowerCase();
+    const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (today.getDay() + 6) % 7);
+    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+    const firstDay = localDayKey(weekStart);
+    const lastDay = localDayKey(weekEnd);
     const names = new Map(people.map((person) => [person.id, person.name]));
     const participantIds = new Set(people.filter((person) => userId && person.userId === userId).map((person) => person.id));
     if (userId && !people.some((person) => Object.hasOwn(person, 'userId'))) {
@@ -92,16 +99,22 @@ export function filterTasks(tasks, filters, userId, people = [], today = new Dat
             task.releaseOwnerName || names.get(task.releaseOwnerId)].filter(Boolean).join(' ').toLowerCase();
         const quickViewMatches = {
             'my-work': participantIds.has(task.assigneeId),
-            review: participantIds.has(task.reviewerId) && reviewStatuses.includes(task.status),
+            'my-open': participantIds.has(task.assigneeId) && !isTaskClosed(task),
+            'due-week': !isTaskClosed(task) && Boolean(deadlineKey(task.dueDate)) &&
+                deadlineKey(task.dueDate) >= firstDay && deadlineKey(task.dueDate) <= lastDay,
+            review: participantIds.has(task.reviewerId) && taskKind(task) === 'Review',
             releases: participantIds.has(task.releaseOwnerId),
             created: task.createdById === userId,
             overdue: isOverdue(task, today),
         };
         return (
             (!query || searchable.includes(query)) &&
-            (!filters.status || task.status === filters.status) &&
+            (!filters.status || taskStatusKey(task) === filters.status || task.status === filters.status ||
+                (task.workflow && `${task.workflow.id}:${task.status}` === filters.status)) &&
             (!filters.discipline || task.discipline === filters.discipline) &&
             (!filters.projectId || task.projectId === filters.projectId) &&
+            (!filters.assigneeId || (filters.assigneeId === 'unassigned' ? !task.assigneeId : task.assigneeId === filters.assigneeId)) &&
+            (!(filters.labelIds?.length) || filters.labelIds.every((id) => task.labels?.some((label) => label.id === id))) &&
             (!filters.mine || participantIds.has(task.assigneeId)) &&
             (!filters.quickView || quickViewMatches[filters.quickView] === true)
         );
@@ -193,7 +206,7 @@ export function sortTasks(tasks, sort = 'updatedAtUtc', direction = 'desc') {
 export function isOverdue(task, today = new Date()) {
     const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     return Boolean(
-        task.dueDate && task.dueDate.slice(0, 10) < date && !['Completed', 'Cancelled'].includes(task.status),
+        task.dueDate && task.dueDate.slice(0, 10) < date && !isTaskClosed(task),
     );
 }
 
