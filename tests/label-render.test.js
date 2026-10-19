@@ -36,6 +36,9 @@ test('label rendering escapes names, retains inactive labels and restricts assig
         assert.match(admin, /&lt;script&gt;/);
         assert.doesNotMatch(admin, /<script>/);
         assert.match(admin, /\(inactive\)/);
+        const integrated = render('Administrator', TaskLabels, { ...props, integrated: true });
+        assert.doesNotMatch(integrated, /Save labels|Save labels separately/);
+        assert.match(integrated, /Changes are included when you Save the task/);
         const missingDefinition = render('Administrator', TaskLabels, props, [task], []);
         assert.match(missingDefinition, /aria-label="Remove &lt;script&gt;alert\(1\)&lt;\/script&gt;"/);
         assert.match(missingDefinition, /type="checkbox" checked=""/);

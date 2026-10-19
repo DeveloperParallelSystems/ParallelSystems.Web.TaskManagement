@@ -35,6 +35,7 @@ function removePrivateTask(state, id) {
         }
     }
     state.dependencies = {};
+    state.linkedTickets = {};
     state.requestId = null;
     if (state.status === 'loading') {
         state.status = 'ready';
@@ -73,6 +74,9 @@ export function addTaskTransitionReducers(builder) {
         state.requestId = null;
         if (state.status === 'loading') {
             state.status = 'ready';
+        }
+        if (state.linkedTickets?.[id]) {
+            state.linkedTickets[id].stale = true;
         }
         if (state.dependencies[id]) {
             state.dependencies[id].stale = true;

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { defaultTaskColumns } from '../src/features/tasks/taskColumns.js';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -45,6 +46,9 @@ test('one shared board displays both disciplines without workflow headings and a
             disciplineWorkflows: { data: { items: [{ discipline: 'Drafting', active: workflow },
                 { discipline: 'Development', active: development }] } },
         } };
+        state.workspace.taskColumns = Object.fromEntries(['default'].flatMap((scope) =>
+            Object.entries(defaultTaskColumns).map(([discipline, columns]) => [`${scope}:${discipline}`, { data: { columns } }])));
+        state.workspace.tasks.forEach((task) => { task.discipline ||= 'Development'; });
         const store = { getState: () => state, subscribe: () => () => {}, dispatch: () => {} };
         function render(Component, props = {}, path = '/tasks') {
             return renderToStaticMarkup(React.createElement(Provider, { store }, React.createElement(StaticRouter,

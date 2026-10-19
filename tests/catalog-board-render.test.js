@@ -44,9 +44,28 @@ test('one board editor and preview use catalog names without a secondary groupin
         assert.match(markup, /Move &lt;Design QA&gt; to column/);
         assert.match(markup, /aria-label="Review: 1 task"/);
         assert.match(markup, /aria-label="Planning: 0 tasks"/);
-        assert.equal((markup.match(/>Save board layout</g) || []).length, 1);
+        assert.equal((markup.match(/>Save default layout</g) || []).length, 1);
         assert.equal((markup.match(/<select/g) || []).length, 2);
         assert.doesNotMatch(markup, /Additional status groupings|Save status groupings|Move Released to column|<Design QA>/);
+        const projectId = '11111111-1111-1111-1111-111111111111';
+        state.workspace.projectPresentations = { [projectId]: { data: {
+            ...state.workspace.workflowPresentation.data, projectId, projectVersion: 0, usesDefault: true } } };
+        const renderProject = () => renderToStaticMarkup(React.createElement(Provider, { store },
+            React.createElement(Page, { projectId, projectName: '<Project>', clientName: 'Client', onEditingChange: () => {} })));
+        const inherited = renderProject();
+        assert.match(inherited, /Using default/);
+        assert.match(inherited, /Project board grouping/);
+        assert.doesNotMatch(inherited, /Board and dashboard grouping/);
+        assert.match(inherited, /Customize this project/);
+        assert.match(inherited, /Client \/ &lt;Project&gt;/);
+        assert.match(inherited, /aria-label="Review: 0 tasks"/);
+        assert.doesNotMatch(inherited, /Use default columns/);
+        assert.match(inherited, /<button class="button primary" disabled=""><svg[^]*?Save project layout/);
+        state.workspace.projectPresentations[projectId].data.usesDefault = false;
+        const custom = renderProject();
+        assert.match(custom, /Custom layout/);
+        assert.match(custom, /Use default layout/);
+        assert.doesNotMatch(custom, /Customize this project/);
     }
     finally {
         assert.ok(scratch.startsWith(root + '\\') || scratch.startsWith(root + '/'));

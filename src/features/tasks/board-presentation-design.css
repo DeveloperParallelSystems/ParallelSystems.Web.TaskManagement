@@ -2,6 +2,31 @@
     min-width: 0;
 }
 
+.presentation-scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 18px;
+    margin-bottom: 24px;
+    border: 1px solid #e3e8e1;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.presentation-scope label {
+    display: grid;
+    flex: 1 1 200px;
+    min-width: 0;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.presentation-scope select {
+    width: 100%;
+    min-width: 0;
+}
+
 .presentation-management .blue {
     --presentation-color: #547594;
     --presentation-tint: #edf2f7;

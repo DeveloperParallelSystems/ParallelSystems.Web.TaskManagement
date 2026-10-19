@@ -1,0 +1,46 @@
+.client-card {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+.client-card:focus-visible {
+    outline: 2px solid var(--accent, #4f46e5);
+    outline-offset: 3px;
+}
+
+.client-project {
+    min-width: 0;
+}
+
+.project-client-button {
+    margin-top: 8px;
+}
+
+.general-work-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.general-work-link p {
+    margin-bottom: 0;
+}
+
+.breadcrumb a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+    .general-work-link {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

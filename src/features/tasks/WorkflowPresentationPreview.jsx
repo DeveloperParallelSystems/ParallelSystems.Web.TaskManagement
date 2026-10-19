@@ -1,4 +1,4 @@
-export default function WorkflowPresentationPreview({ groups, tasks, statusSettings, catalog = null }) {
+export default function WorkflowPresentationPreview({ groups, tasks, statusSettings, catalog = null, projectOnly = false }) {
     const statusName = (code) => catalog?.find((item) => item.code === code)?.name || code;
     const counts = new Map();
     for (const task of tasks) {
@@ -15,7 +15,7 @@ export default function WorkflowPresentationPreview({ groups, tasks, statusSetti
     return <section className="presentation-preview" aria-labelledby="presentation-preview-title">
         <div className="presentation-section-heading">
             <h2 id="presentation-preview-title">Live preview</h2>
-            <p>Board and dashboard grouping · Counts include visible {catalog || statusSettings ? 'tasks' : 'Legacy v1 tasks'}</p>
+            <p>{projectOnly ? 'Project board grouping' : 'Board and dashboard grouping'} · Counts include visible {catalog || statusSettings ? 'tasks' : 'Legacy v1 tasks'}</p>
         </div>
         <div className="presentation-preview-grid">
             {groups.map((group) => {

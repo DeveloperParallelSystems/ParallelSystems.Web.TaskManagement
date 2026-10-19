@@ -3,19 +3,20 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, Columns3, List, Search, SlidersHorizontal, Tags } from 'lucide-react';
 import { loadTaskDetail, loadWorkspace, moveTask } from '../../app/store';
-import { dateLabel, disciplines, filterTasks, isOverdue, sortTasks, statuses } from './workflow';
-import { boardMoveStatuses, taskKind, taskStatusName, taskStatusTone, taskStatusOptions, workflowBoards } from './taskWorkflow';
+import { disciplines, filterTasks, sortTasks, statuses } from './workflow';
+import { boardMoveStatuses, taskKind, taskStatusName, taskStatusOptions, workflowBoards } from './taskWorkflow';
 import { selectPresentationGroups } from './workflowPresentation';
+import { loadProjectPresentation, selectProjectPresentationGroups, useProjectPresentation } from './projectBoardPresentation';
 import { defaultTaskQuery, parseTaskQuery, quickViews, serializeTaskQuery, sortOptions } from './taskQuery';
 import { canMoveTask, needsReviewNote } from './taskActions';
 import { downloadTaskCsv } from './taskCsv';
 import { TaskMoveMenu } from './TaskMoves';
 import BulkTaskActions from './BulkTaskActions';
-import TaskContributors from './TaskContributors';
-import { ChecklistProgress } from './TaskChecklist';
 import LabelBadges from './LabelBadges';
 import TaskCalendar, { useLocalToday } from './TaskCalendar';
 import { calendarFilterOptions } from './calendar';
+import { columnLabels, defaultTaskColumns, listTaskColumns, loadTaskColumns, requiredTaskColumns, taskColumnLabels, useTaskColumnProfiles } from './taskColumns';
+import TaskColumnContent from './TaskColumnContent';
 
 export function Stats({ tasks }) {
     const items = [
@@ -53,51 +54,43 @@ export function Stats({ tasks }) {
 }
 
 export function TaskCard({ task, people = [], onOpen, draggable = false, onDragStart, onDragEnd }) {
-    return (
-        <article className={`task-card priority-${task.priority.toLowerCase()}`}
-            draggable={draggable} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-            <button type="button" className="task-card-open" onClick={() => onOpen(task.id)}
-                aria-label={`Open ${task.code}: ${task.title}`}>
-                <div className="card-top">
-                    <span className="task-code">{task.code}</span>
-                    <span className={`priority ${task.priority.toLowerCase()}`}>
-                        <i />
-                        {task.priority}
-                    </span>
-                </div>
-                <h3>{task.title}</h3>
-                <div className="project-name">{task.projectName || 'General'}</div>
-                {task.description && <p className="card-description">{task.description}</p>}
-                <div className="tags">
-                    <span className="discipline">{task.discipline}</span>
-                    <span className={`badge ${taskStatusTone(task)}`}>{taskStatusName(task)}</span>
-                </div>
-                <ChecklistProgress summary={task.checklistSummary} compact />
-                <LabelBadges labels={task.labels} />
-            </button>
-            <div className="card-footer">
-                <TaskContributors task={task} people={people} />
-                <span className={isOverdue(task) ? 'due overdue' : 'due'}>
-                    <CalendarDays size={12} />
-                    {dateLabel(task.dueDate)}
-                </span>
-            </div>
-            {task.assigneeName && <div className="card-owner">Current owner: {task.assigneeName}</div>}
-        </article>
-    );
+    return <article className={`task-card priority-${task.priority.toLowerCase()}`}
+        draggable={draggable} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <button type="button" className="task-card-open" onClick={() => onOpen(task.id)}
+            aria-label={`Open ${task.code}: ${task.title}`}>
+            {requiredTaskColumns.map((field) => <div className={`task-card-field field-${field}`} key={field}>
+                {field !== 'task' && <span className="task-card-field-label">{taskColumnLabels[field]}: </span>}
+                <TaskColumnContent field={field} task={task} people={people} card />
+            </div>)}
+        </button>
+    </article>;
 }
 
-export default function TasksPage({ onOpen }) {
+export default function TasksPage({ onOpen, projectScope = null }) {
     const dispatch = useDispatch();
-    const groups = useSelector(selectPresentationGroups);
-    const { tasks, projects, people, details, bulkBusy, labels = [] } = useSelector((state) => state.workspace);
+    const layoutProjectId = projectScope && projectScope !== 'general' ? projectScope : null;
+    useProjectPresentation(layoutProjectId);
+    const columnResources = useTaskColumnProfiles(layoutProjectId);
+    const columnProfiles = Object.fromEntries(Object.entries(columnResources).map(([discipline, resource]) => [discipline, resource.data?.columns]));
+    const labelsByColumn = columnLabels(Object.values(columnResources).flatMap((resource) => resource.data?.customFields || []));
+    const projectLayout = useSelector((state) => state.workspace.projectPresentations?.[layoutProjectId]);
+    const groups = useSelector((state) => layoutProjectId ? selectProjectPresentationGroups(state, layoutProjectId) : selectPresentationGroups(state));
+    const { tasks: workspaceTasks, projects, people, details, bulkBusy, labels = [] } = useSelector((state) => state.workspace);
+    const tasks = projectScope ? workspaceTasks.filter((task) => projectScope === 'general' ? !task.projectId : task.projectId === projectScope) : workspaceTasks;
     const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
     const disciplineWorkflows = useSelector((state) => state.workspace.disciplineWorkflows?.data?.items);
     const user = useSelector((state) => state.auth.user);
     const administrator = user.role === 'Administrator';
     const [params, setParams] = useSearchParams();
     const filters = parseTaskQuery(params);
+    if (projectScope) {
+        filters.projectId = '';
+    }
     const view = filters.view;
+    const columns = listTaskColumns(columnProfiles, filters.discipline);
+    const relevantResources = filters.discipline ? [columnResources[filters.discipline]].filter(Boolean) : Object.values(columnResources);
+    const columnsReady = relevantResources.length > 0 && relevantResources.every((resource) => resource.data);
+    const columnsFailure = relevantResources.find((resource) => resource.error)?.error;
     const today = useLocalToday();
     const visible = sortTasks(filterTasks(tasks, filters, user.userId, people, new Date(`${today}T12:00:00`)), filters.sort, filters.direction);
     const filterOptions = calendarFilterOptions(tasks, people, projects);
@@ -225,6 +218,19 @@ export default function TasksPage({ onOpen }) {
 
     return (
         <>
+            {layoutProjectId && projectLayout?.error && <p className="error" role="alert">
+                Could not refresh this project’s board presentation. {projectLayout.data ? 'Showing its last loaded layout.' : 'The board is unavailable; list and calendar views remain accessible.'}
+                <button type="button" className="text-button" onClick={() => dispatch(loadProjectPresentation(layoutProjectId))}>Retry layout</button>
+            </p>}
+            {view === 'list' && columnsFailure && <p className="error" role="alert">Could not refresh task columns. {columnsFailure.message}
+                {columnsReady && ' Showing the last loaded configuration.'}
+                <button type="button" className="text-button" onClick={() => {
+                    for (const discipline of Object.keys(defaultTaskColumns)) {
+                        dispatch(loadTaskColumns({ projectId: layoutProjectId, discipline }));
+                    }
+                }}>Retry task columns</button>
+            </p>}
+            {!columnsReady && view === 'list' && <p role="status">Task columns are unavailable or still loading. Board and calendar remain available.</p>}
             <Stats tasks={tasks} />
             <section className="toolbar" aria-label="Task filters">
                 <button type="button" className="button mobile-filter-toggle" aria-expanded={mobileFiltersOpen}
@@ -253,7 +259,7 @@ export default function TasksPage({ onOpen }) {
                         <option value="">All disciplines</option>
                         {disciplines.map((discipline) => <option key={discipline}>{discipline}</option>)}
                     </select>
-                    <select
+                    {!projectScope && <select
                         aria-label="Filter project"
                         value={filters.projectId}
                         onChange={(event) => updateQuery({ projectId: event.target.value })}
@@ -266,7 +272,7 @@ export default function TasksPage({ onOpen }) {
                                 {project.name}
                             </option>
                         ))}
-                    </select>
+                    </select>}
                     <select aria-label="Filter assignee (current owner)" value={filters.assigneeId}
                         onChange={(event) => updateQuery({ assigneeId: event.target.value })}>
                         <option value="">All current owners</option>
@@ -449,7 +455,7 @@ export default function TasksPage({ onOpen }) {
                     })}
                 </section>
             )}
-            {visible.length > 0 && view === 'list' && (
+            {visible.length > 0 && columnsReady && view === 'list' && (
                 <div className="table-wrap">
                     <table>
                         <thead>
@@ -463,12 +469,7 @@ export default function TasksPage({ onOpen }) {
                                             }} />
                                     </th>
                                 )}
-                                <th>Task</th>
-                                <th>Discipline</th>
-                                <th>Status</th>
-                                <th>Priority</th>
-                                <th>Assigned to</th>
-                                <th>Due</th>
+                                {columns.map((field) => <th key={field}>{labelsByColumn[field]}</th>)}
                             </tr>
                         </thead>
                         <tbody>
@@ -478,24 +479,11 @@ export default function TasksPage({ onOpen }) {
                                         <td><input type="checkbox" aria-label={`Select ${task.code}`} checked={Boolean(selected[task.id])}
                                             disabled={bulkBusy} onChange={(event) => toggleSelected(task, event.target.checked)} /></td>
                                     )}
-                                    <td>
-                                        <button className="table-task" onClick={() => onOpen(task.id)}>
-                                            <small>{task.code}</small>
-                                            <strong>{task.title}</strong>
-                                            <span>{task.projectName || 'General'}</span>
-                                        </button>
-                                    </td>
-                                    <td>{task.discipline}<LabelBadges labels={task.labels} /></td>
-                                    <td>
-                                        <span className={`badge ${taskStatusTone(task)}`}>
-                                            {taskStatusName(task)}
-                                        </span>
-                                    </td>
-                                    <td>{task.priority}</td>
-                                    <td>{task.assigneeName || 'Unassigned'}</td>
-                                    <td className={isOverdue(task) ? 'overdue' : ''}>
-                                        {dateLabel(task.dueDate)}
-                                    </td>
+                                    {columns.map((field) => <td key={field}>
+                                        {columnProfiles[task.discipline]?.includes(field)
+                                            ? <TaskColumnContent field={field} task={task} people={people}
+                                                customFields={columnResources[task.discipline]?.data?.customFields} onOpen={onOpen} /> : '—'}
+                                    </td>)}
                                 </tr>
                             ))}
                         </tbody>

@@ -21,7 +21,7 @@ export function LabelPickerChoices({ options, selected, query, onToggle }) {
     </div>;
 }
 
-export default function TaskLabels({ task, disabled, onEditingChange, onSaved, onFailure }) {
+export default function TaskLabels({ task, disabled, onEditingChange, onSaved, onFailure, integrated = false }) {
     const dispatch = useDispatch();
     const { labels = [], tasks } = useSelector((state) => state.workspace);
     const administrator = useSelector((state) => state.auth.user?.role === 'Administrator');
@@ -47,9 +47,16 @@ export default function TaskLabels({ task, disabled, onEditingChange, onSaved, o
     }
 
     useEffect(() => {
-        onEditingChange({ dirty, saving });
-    }, [dirty, saving, onEditingChange]);
+        onEditingChange({ dirty, saving, ...(integrated ? { labelIds: selected } : {}) });
+    }, [dirty, saving, selected, integrated, onEditingChange]);
     useEffect(() => () => onEditingChange({ dirty: false, saving: false }), [onEditingChange]);
+    useEffect(() => {
+        if (integrated) {
+            setSelected((task.labels || []).map((label) => label.id));
+            setDirty(false);
+            setError(null);
+        }
+    }, [integrated, task.id, task.version]);
 
     async function save(event) {
         event.preventDefault();
@@ -77,8 +84,8 @@ export default function TaskLabels({ task, disabled, onEditingChange, onSaved, o
         <h2 id="task-label-heading">Labels</h2>
         {!administrator && <LabelBadges labels={task.labels} />}
         {!task.labels?.length && !dirty && <p className="muted">No labels assigned.</p>}
-        {administrator && <form onSubmit={save}>
-            <p className="hint">Select up to 20 labels. Save labels separately from task details.</p>
+        {administrator && <form onSubmit={integrated ? (event) => event.preventDefault() : save}>
+            <p className="hint">{integrated ? 'Select up to 20 labels. Changes are included when you Save the task.' : 'Select up to 20 labels. Save labels separately from task details.'}</p>
             {error && <p className="error" role="alert">{error.message}</p>}
             <fieldset className="label-options" disabled={saving || disabled}>
                 <legend>Available labels</legend>
@@ -95,7 +102,7 @@ export default function TaskLabels({ task, disabled, onEditingChange, onSaved, o
                 </div>
             </fieldset>
             <div className="label-actions">
-                <button className="button primary" disabled={!dirty || saving || disabled}>{saving ? 'Saving…' : 'Save labels'}</button>
+                {!integrated && <button className="button primary" disabled={!dirty || saving || disabled}>{saving ? 'Saving…' : 'Save labels'}</button>}
                 <button type="button" className="button" disabled={!dirty || saving || disabled} onClick={() => {
                     setSelected((task.labels || []).map((label) => label.id));
                     setDirty(false);

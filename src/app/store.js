@@ -5,8 +5,12 @@ import { addDiscussionReducers } from '../features/tasks/discussionState.js';
 import { addAttachmentReducers } from '../features/tasks/attachmentState.js';
 import { addChecklistReducers, reconcileChecklists } from '../features/tasks/checklistState.js';
 import { addLabelReducers, reconcileLabelMutations } from '../features/tasks/labelState.js';
+import { addLinkedTicketReducers, reconcileLinkedTickets } from '../features/tasks/linkedTicketState.js';
 import { addDependencyReducers, reconcileDependencies } from '../features/tasks/dependencyState.js';
 import { addPresentationReducers, emptyPresentation } from '../features/tasks/workflowPresentation.js';
+import { addProjectPresentationReducers } from '../features/tasks/projectBoardPresentation.js';
+import { addTaskColumnReducers, reconcileTaskColumns } from '../features/tasks/taskColumns.js';
+import { addCustomFieldReducers } from '../features/tasks/customFields.js';
 import { addDisciplineWorkflowReducers, emptyDisciplineWorkflows } from '../features/tasks/disciplineWorkflows.js';
 import { addTaskTransitionReducers } from '../features/tasks/taskTransitions.js';
 import { addStatusSettingsReducers, emptyStatusSettings } from '../features/tasks/liveStatuses.js';
@@ -197,9 +201,10 @@ export const saveTask = createAsyncThunk('workspace/save', async ({ id, values }
     }
 });
 
-export const createProject = createAsyncThunk('workspace/createProject', async (name, { rejectWithValue }) => {
+export const createProject = createAsyncThunk('workspace/createProject', async (input, { rejectWithValue }) => {
     try {
-        return await request('/projects', { method: 'POST', body: { name } });
+        const body = typeof input === 'string' ? { name: input } : input;
+        return await request('/projects', { method: 'POST', body });
     }
     catch (error) {
         return rejectWithValue(error.message);
@@ -211,12 +216,19 @@ const emptyWorkspace = {
     disciplineWorkflows: emptyDisciplineWorkflows,
     taskTransitions: {},
     workflowPresentation: emptyPresentation,
+    projectPresentations: {},
+    taskColumns: {},
+    customFields: {},
+    taskColumnsRevision: 0,
+    taskColumnsEpoch: 0,
     tasks: [],
     people: [],
     projects: [],
+    clients: [],
     labels: [],
     labelMutations: {},
     dependencies: {},
+    linkedTickets: {},
     notifications: { items: [], unreadCount: 0 },
     status: 'idle',
     error: null,
@@ -264,6 +276,8 @@ const workspaceSlice = createSlice({
             reconcileChecklists(state, previousTasks, bindingsChanged);
             reconcileLabelMutations(state, bindingsChanged);
             reconcileDependencies(state, previousTasks, bindingsChanged);
+            reconcileLinkedTickets(state, previousTasks, bindingsChanged);
+            reconcileTaskColumns(state, bindingsChanged);
             if (bindingsChanged) {
                 state.taskTransitions = {};
                 state.details = {};
@@ -346,7 +360,11 @@ const workspaceSlice = createSlice({
         addChecklistReducers(builder);
         addLabelReducers(builder);
         addDependencyReducers(builder);
+        addLinkedTicketReducers(builder);
         addPresentationReducers(builder);
+        addProjectPresentationReducers(builder);
+        addTaskColumnReducers(builder);
+        addCustomFieldReducers(builder);
         addDisciplineWorkflowReducers(builder);
         addTaskTransitionReducers(builder);
         addStatusSettingsReducers(builder);

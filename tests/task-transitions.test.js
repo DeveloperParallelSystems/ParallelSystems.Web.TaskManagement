@@ -5,7 +5,8 @@ import { addTaskTransitionReducers, transitionTask } from '../src/features/tasks
 
 function fixture() {
     const slice = createSlice({ name: 'workspace', initialState: {
-        tasks: [{ id: 'task', version: 1, checklistSummary: { version: 8, completed: 2, total: 3 } }], taskTransitions: {}, details: {}, detailRequests: {}, dependencies: {}, requestId: 'old-poll',
+        tasks: [{ id: 'task', version: 1, checklistSummary: { version: 8, completed: 2, total: 3 } }], taskTransitions: {}, details: {}, detailRequests: {}, dependencies: {},
+        linkedTickets: { task: { stale: false, children: [{ taskId: 'private-child' }] } }, requestId: 'old-poll',
     }, reducers: { clear: (state) => { state.taskTransitions = {}; } }, extraReducers: addTaskTransitionReducers });
     const auth = createSlice({ name: 'auth', initialState: { user: { userId: 'actor' } }, reducers: {
         reset: () => ({ user: { userId: 'actor' } }),
@@ -26,6 +27,7 @@ test('workflow action sends only action/version/note and adopts canonical task w
         const saved = await store.dispatch(transitionTask({ id: 'task', transitionId: 'approve', version: 1, note: 'Checked' })).unwrap();
         assert.equal(saved.task.checklistSummary.version, 8);
         assert.equal(store.getState().workspace.tasks[0].version, 2);
+        assert.equal(store.getState().workspace.linkedTickets.task.stale, true);
         assert.equal(store.getState().workspace.requestId, null);
     }
     finally {
@@ -50,6 +52,7 @@ test('observed access denial removes task and related private caches', () => {
     store.dispatch(transitionTask.rejected(null, 'request', args, { status: 404, message: 'Unavailable' }));
     assert.equal(store.getState().workspace.tasks.length, 0);
     assert.deepEqual(store.getState().workspace.details, {});
+    assert.deepEqual(store.getState().workspace.linkedTickets, {});
 });
 
 test('transition response preserves independently newer checklist summaries in list and details', () => {
@@ -72,6 +75,7 @@ test('successful handoff with lost visibility acknowledges success and clears pr
         assert.equal(store.getState().workspace.tasks.length, 0);
         assert.deepEqual(store.getState().workspace.details, {});
         assert.deepEqual(store.getState().workspace.dependencies, {});
+        assert.deepEqual(store.getState().workspace.linkedTickets, {});
         assert.equal(store.getState().workspace.requestId, null);
     }
     finally {

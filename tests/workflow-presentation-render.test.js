@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { defaultTaskColumns } from '../src/features/tasks/taskColumns.js';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -35,6 +36,9 @@ test('board and dashboard use configured columns without changing canonical stat
                 tasks: [{ id: 'task', code: 'TASK-1', title: 'Visible task', priority: 'Medium', status: 'Backlog' }],
                 people: [], projects: [], labels: [], details: {}, bulkBusy: false },
         };
+        state.workspace.taskColumns = Object.fromEntries(['default'].flatMap((scope) =>
+            Object.entries(defaultTaskColumns).map(([discipline, columns]) => [`${scope}:${discipline}`, { data: { columns } }])));
+        state.workspace.tasks.forEach((task) => { task.discipline ||= 'Development'; });
         const store = { getState: () => state, subscribe: () => () => {}, dispatch: () => {} };
         function render(Component) {
             return renderToStaticMarkup(React.createElement(Provider, { store },

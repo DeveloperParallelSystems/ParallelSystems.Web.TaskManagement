@@ -234,15 +234,18 @@
 .task-label-panel {
     margin-top: 20px;
 }
-.task-dependencies {
+.task-dependencies,
+.task-linked-tickets {
     margin-top: 20px;
 }
-.dependency-list {
+.dependency-list,
+.linked-ticket-list {
     list-style: none;
     padding: 0;
     margin: 12px 0 20px;
 }
-.dependency-list li {
+.dependency-list li,
+.linked-ticket-list li {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -250,27 +253,32 @@
     padding: 8px 0;
     border-bottom: 1px solid var(--line);
 }
-.dependency-list a {
+.dependency-list a,
+.linked-ticket-list a {
     flex: 1;
     min-width: 180px;
     color: var(--navy);
     overflow-wrap: anywhere;
 }
-.dependency-form {
+.dependency-form,
+.linked-ticket-form {
     max-width: 720px;
 }
-.dependency-actions {
+.dependency-actions,
+.linked-ticket-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 12px;
 }
 @media (max-width: 600px) {
-    .dependency-list li {
+    .dependency-list li,
+    .linked-ticket-list li {
         align-items: flex-start;
         flex-direction: column;
     }
-    .dependency-actions .button {
+    .dependency-actions .button,
+    .linked-ticket-actions .button {
         width: 100%;
     }
 }

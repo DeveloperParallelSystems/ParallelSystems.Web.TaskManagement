@@ -106,7 +106,7 @@ export function useNavigate() {
                 child.key !== null && (child.props.taskId || child.props.task));
         }
         const initial = panels('task-one', 1);
-        assert.equal(initial.length, 3, 'Labels, checklist and dependencies must remain mounted with stable keys.');
+        assert.equal(initial.length, 3, 'Labels, checklist and linked tickets must remain mounted with stable keys.');
         assert.equal(new Set(initial.map((panel) => panel.key)).size, initial.length,
             'Sibling panels must not share a React key: duplicate keys can leave orphaned panels after updates.');
         assert.deepEqual(panels('task-one', 2).map((panel) => panel.key), initial.map((panel) => panel.key));
@@ -117,9 +117,13 @@ export function useNavigate() {
         const task = { id: 'existing', title: 'Task', discipline: 'Development', status: 'To Do' };
         reset(task);
         const simpleTree = TaskPage({ id: task.id, onEditingChange: () => {}, onClose: () => {}, onSaved: () => {} });
-        const control = descendants(simpleTree).find((child) => child?.props?.settings && child?.props?.allowedStatuses);
-        assert.ok(control, 'Simple status control must remain mounted in the side column.');
-        assert.equal(control.props.task, task);
+        const controls = descendants(simpleTree);
+        const control = controls.find((child) => child.type === 'select' && child.props['aria-label'] === 'Status');
+        assert.ok(control, 'Status must be part of the unified task form.');
+        assert.equal(control.props.value, task.status);
+        assert.equal(control.props.form, 'task-details-form');
+        assert.equal(controls.filter((child) => child.type === 'button' && child.props.type === 'submit').length, 1);
+        assert.equal(controls.some((child) => child.type === 'span' && ['Activity note', 'Status note (optional)'].includes(child.props.children)), false);
         assert.ok(!descendants(simpleTree).some((child) => child?.props?.details && child?.props?.onReload), 'Historical workflow actions must not be exposed.');
         const legacyOverview = renderToStaticMarkup(React.createElement(TaskStageOverview, { task: { status: 'Failed Review' } }));
         assert.equal((legacyOverview.match(/<li/g) || []).length, statuses.length);

@@ -4,35 +4,46 @@ import { useBlocker } from 'react-router-dom';
 import { Check, Info, RefreshCw, Save } from 'lucide-react';
 import WorkflowPresentationEditor from './WorkflowPresentationEditor';
 import WorkflowPresentationPreview from './WorkflowPresentationPreview';
-import { defaultPresentationGroups, loadPresentation, presentationError, savePresentation } from './workflowPresentation';
+import { defaultPresentationGroups, emptyPresentation, loadPresentation, presentationError, savePresentation } from './workflowPresentation';
+import { loadProjectPresentation, saveProjectPresentation, useDefaultPresentation, useProjectPresentation } from './projectBoardPresentation';
 import './board-presentation-design.css';
 
-export default function WorkflowPresentationPage({ onEditingChange }) {
+export default function WorkflowPresentationPage({ onEditingChange, projectId = null, projectName = '', clientName = '' }) {
     const dispatch = useDispatch();
-    const resource = useSelector((state) => state.workspace.workflowPresentation);
+    const resource = useSelector((state) => projectId
+        ? state.workspace.projectPresentations?.[projectId] || emptyPresentation
+        : state.workspace.workflowPresentation);
+    useProjectPresentation(projectId);
     const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
-    const tasks = useSelector((state) => state.workspace.tasks);
+    const workspaceTasks = useSelector((state) => state.workspace.tasks);
+    const tasks = projectId ? workspaceTasks.filter((task) => task.projectId === projectId) : workspaceTasks;
     const [draft, setDraft] = useState(resource.data);
     const [dirty, setDirty] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
     const [message, setMessage] = useState('');
+    const [customizing, setCustomizing] = useState(false);
     const unsaved = dirty;
     const pending = busy;
     const confirmRef = useRef(null);
     const blocker = useBlocker(({ currentLocation, nextLocation }) =>
         (unsaved || pending) && currentLocation.pathname !== nextLocation.pathname);
     const canManage = resource.data?.canManage && resource.data.supported && Boolean(draft?.catalogVersion);
+    const canEdit = canManage && (!projectId || !draft?.usesDefault || customizing);
     const stale = Boolean(draft && resource.data && (draft.version !== resource.data.version || draft.catalogVersion !== resource.data.catalogVersion ||
+        draft.projectVersion !== resource.data.projectVersion ||
         Boolean(statusSettings && statusSettings.version > draft.catalogVersion)));
     const validation = draft ? presentationError(draft.groups, draft.catalog) : '';
     const failure = error || resource.error;
+    const saveLabel = projectId ? 'Save project layout' : 'Save default layout';
 
     useEffect(() => {
-        dispatch(loadPresentation());
-    }, [dispatch]);
+        if (!projectId) {
+            dispatch(loadPresentation());
+        }
+    }, [dispatch, projectId]);
     useEffect(() => {
-        if (!dirty && !busy && resource.data) {
+        if (!dirty && !busy) {
             setDraft(resource.data);
         }
     }, [resource.data, dirty, busy]);
@@ -75,9 +86,10 @@ export default function WorkflowPresentationPage({ onEditingChange }) {
         setError(null);
         setMessage('');
         try {
-            const result = await dispatch(loadPresentation()).unwrap();
+            const result = await dispatch(projectId ? loadProjectPresentation(projectId) : loadPresentation()).unwrap();
             setDraft(result);
             setDirty(false);
+            setCustomizing(false);
         }
         catch (failure) {
             setError({ message: failure.message || 'Could not reload board presentation. Try again.' });
@@ -89,16 +101,39 @@ export default function WorkflowPresentationPage({ onEditingChange }) {
 
     async function save(event) {
         event.preventDefault();
-        if (!canManage || !dirty || pending || stale || validation) {
+        if (!canEdit || !dirty || pending || stale || validation) {
             return;
         }
         setBusy(true);
         setError(null);
         try {
-            const result = await dispatch(savePresentation({ version: draft.version, catalogVersion: draft.catalogVersion, catalog: draft.catalog, groups: draft.groups })).unwrap();
+            const input = { ...draft, projectId };
+            const result = await dispatch(projectId ? saveProjectPresentation(input) : savePresentation(input)).unwrap();
             setDraft(result);
             setDirty(false);
-            setMessage('Board presentation saved for everyone. Workflow rules and task statuses are unchanged.');
+            setCustomizing(false);
+            setMessage(projectId ? 'Project layout saved.' : 'Default layout saved for all projects using the default.');
+        }
+        catch (failure) {
+            setError(failure);
+        }
+        finally {
+            setBusy(false);
+        }
+    }
+
+    async function resetToDefault() {
+        if (!canManage || pending || stale || !window.confirm('Replace this project’s custom layout with the shared default? Unsaved changes will be discarded. Future default changes will apply to this project.')) {
+            return;
+        }
+        setBusy(true);
+        setError(null);
+        try {
+            const result = await dispatch(useDefaultPresentation({ ...draft, projectId })).unwrap();
+            setDraft(result);
+            setDirty(false);
+            setCustomizing(false);
+            setMessage('This project now uses the shared default layout.');
         }
         catch (failure) {
             setError(failure);
@@ -111,9 +146,10 @@ export default function WorkflowPresentationPage({ onEditingChange }) {
     return <section className="presentation-management" aria-labelledby="presentation-heading">
         <header className="presentation-page-heading">
             <div>
-                <p className="presentation-eyebrow">Administration · Shared board</p>
+                <p className="presentation-eyebrow">Administration · {projectId ? 'Project layout' : 'Default layout'}</p>
                 <h1 id="presentation-heading">Board presentation</h1>
-                <p className="hint">Arrange the shared board columns. Assign available task statuses under Discipline statuses. Moving a status here changes its board grouping without moving tasks.</p>
+                {projectId && <p><strong>{clientName} / {projectName}</strong></p>}
+                <p className="hint">{projectId ? 'Customize columns for this project, or follow the shared default.' : 'Changes apply to every project using the default, General tasks, and the dashboard. Custom project layouts are unaffected.'} Task statuses and workflow rules stay unchanged.</p>
             </div>
             <div className="presentation-metadata">
                 {draft?.supported && <p>Configuration version <strong>{draft.version}</strong></p>}
@@ -128,6 +164,7 @@ export default function WorkflowPresentationPage({ onEditingChange }) {
         <form onSubmit={save} aria-busy={busy}>
             <div className="presentation-toolbar">
                 <div className="presentation-draft-summary" role="status">
+                    {projectId && draft && <span className="presentation-draft-badge">{draft.usesDefault ? 'Using default' : 'Custom layout'}</span>}
                     <span className={`presentation-draft-badge ${dirty ? 'unsaved' : ''}`}>
                         {busy ? 'Please wait…' : dirty ? 'Unsaved draft' : draft?.supported === false ? 'Default layout' : draft ? 'Saved layout' : 'Loading layout'}
                     </span>
@@ -136,7 +173,15 @@ export default function WorkflowPresentationPage({ onEditingChange }) {
                     </span>}
                 </div>
                 <div className="presentation-toolbar-actions">
-                    <button type="button" className="button" disabled={pending || !canManage}
+                    {projectId && draft?.usesDefault && !customizing && <button type="button" className="button primary"
+                        disabled={pending || !canManage || stale} onClick={() => {
+                            setCustomizing(true);
+                            setDirty(true);
+                            setMessage('Changes will apply to this project only after saving.');
+                        }}>Customize this project</button>}
+                    {projectId && draft && !draft.usesDefault && <button type="button" className="button"
+                        disabled={pending || !canManage || stale} onClick={resetToDefault}>Use default layout</button>}
+                    {!projectId && <button type="button" className="button" disabled={pending || !canEdit}
                         onClick={() => {
                             if (!dirty || window.confirm('Replace your unsaved layout with the default columns?')) {
                                 const defaults = structuredClone(defaultPresentationGroups).map((group) => ({ ...group, statuses: [] }));
@@ -146,21 +191,21 @@ export default function WorkflowPresentationPage({ onEditingChange }) {
                                 }
                                 change(defaults);
                             }
-                        }}>Use default columns</button>
+                        }}>Use default columns</button>}
                     <button type="button" className="button" disabled={!dirty || pending || Boolean(resource.readId) || Boolean(resource.writeId)}
                         onClick={reload}>Discard changes</button>
-                    <button className="button primary" disabled={!canManage || !dirty || pending || stale || Boolean(validation)}>
-                        <Save size={16} aria-hidden="true" />{busy ? 'Please wait…' : 'Save board layout'}
+                    <button className="button primary" disabled={!canEdit || !dirty || pending || stale || Boolean(validation)}>
+                        <Save size={16} aria-hidden="true" />{busy ? 'Please wait…' : saveLabel}
                     </button>
                 </div>
             </div>
             {validation && <p className="error" role="alert">{validation}</p>}
             {draft ? <>
-                <WorkflowPresentationPreview groups={draft.groups} tasks={tasks} catalog={draft.catalog} statusSettings={statusSettings} />
-                <WorkflowPresentationEditor catalog={draft.catalog} groups={draft.groups} onChange={change} disabled={pending || !canManage} />
+                <WorkflowPresentationPreview groups={draft.groups} tasks={tasks} catalog={draft.catalog} statusSettings={statusSettings} projectOnly={Boolean(projectId)} />
+                <WorkflowPresentationEditor catalog={draft.catalog} groups={draft.groups} onChange={change} disabled={pending || !canEdit || stale} />
             </> : <p>Board presentation has not loaded yet.</p>}
         </form>
-        <p className="presentation-guidance"><Info size={18} aria-hidden="true" /><span>Every status from the status catalog must appear in exactly one column. Use up to 13 columns; only empty columns can be removed. Development and Drafting use these same columns on the board and dashboard.</span></p>
+        <p className="presentation-guidance"><Info size={18} aria-hidden="true" /><span>Every status from the status catalog must appear in exactly one column. Use up to 13 columns; only empty columns can be removed. Both disciplines use the selected layout. Project customization does not change the dashboard.</span></p>
         {blocker.state === 'blocked' && <dialog ref={confirmRef} className="project-dialog"
             aria-labelledby="discard-presentation-title" onCancel={(event) => {
                 event.preventDefault();

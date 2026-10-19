@@ -1,25 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CalendarDays, CheckSquare2, Columns3, FolderOpen, FolderPlus, GitBranch, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Tags, X } from 'lucide-react';
+import { Bell, CalendarDays, CheckSquare2, Columns3, GitBranch, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Tags, X } from 'lucide-react';
 import { checkSession, loadWorkspace, logout } from './app/store';
 import LoginPage from './features/auth/LoginPage';
 import TaskPage from './features/tasks/TaskPage';
-import { taskIdFromPath } from './features/tasks/taskNavigation';
-import ProjectDialog from './features/projects/ProjectDialog';
+import { taskIdFromPath, projectScopeFromPath, withoutParentSelection } from './features/tasks/taskNavigation';
+import ClientsPage from './features/projects/ClientsPage';
+import ClientProjectsPage from './features/projects/ClientProjectsPage';
 import NotificationsPage from './features/tasks/NotificationsPage';
 import TasksPage from './features/tasks/TasksPage';
 import LabelsPage from './features/tasks/LabelsPage';
-import WorkflowPresentationPage from './features/tasks/WorkflowPresentationPage';
+import BoardPresentationAdministration from './features/tasks/BoardPresentationAdministration';
+import TaskColumnsAdministration from './features/tasks/TaskColumnsAdministration';
+import { loadTaskColumns } from './features/tasks/taskColumns';
 import { loadPresentation } from './features/tasks/workflowPresentation';
 import StatusSettingsPage from './features/tasks/StatusSettingsPage';
 import StatusCatalogPage from './features/tasks/StatusCatalogPage';
 import { loadStatusSettings } from './features/tasks/liveStatuses';
-import { Dashboard, ProjectsPage } from './features/tasks/OverviewPages';
+import { Dashboard } from './features/tasks/OverviewPages';
 import { initials } from './features/tasks/workflow';
 import { defaultTaskQuery, serializeTaskQuery } from './features/tasks/taskQuery';
 
 const pages = {
+    '/task-columns': { title: 'Task columns', description: 'Choose visible task information by discipline and project.' },
+    '/clients': {
+        title: 'Task Management',
+        description: 'Browse clients and projects to manage their tasks.',
+    },
     '/status-catalog': {
         title: 'Status catalog',
         description: 'Manage shared status names.',
@@ -59,7 +67,6 @@ export default function App() {
     const auth = useSelector((state) => state.auth);
     const workspace = useSelector((state) => state.workspace);
     const [taskEditing, setTaskEditing] = useState({ dirty: false, saving: false });
-    const [creatingProject, setCreatingProject] = useState(false);
     const [toast, setToast] = useState('');
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [workspaceSearch, setWorkspaceSearch] = useState('');
@@ -67,7 +74,17 @@ export default function App() {
     const location = useLocation();
     const navigate = useNavigate();
     const selected = taskIdFromPath(location.pathname);
-    const { title, description } = pages[location.pathname] || pages['/tasks'];
+    const projectScope = projectScopeFromPath(location.pathname);
+    const taskManagementActive = /^\/(clients|projects|tasks)(\/|$)/i.test(location.pathname);
+    const scopedProject = workspace.projects.find((project) => project.id === projectScope);
+    const clientScope = location.pathname.match(/^\/clients\/([^/]+)\/projects\/?$/)?.[1];
+    const scopedClient = (workspace.clients || []).find((client) => client.id === (clientScope || scopedProject?.clientId));
+    const taskBase = projectScope ? `/projects/${projectScope}/tasks` : '/tasks';
+    const canCreateTask = !projectScope || projectScope === 'general' || Boolean(scopedProject);
+    const { title, description } = projectScope
+        ? { title: scopedProject?.name || (projectScope === 'general' ? 'General tasks' : 'Project unavailable'), description: 'Task Management · Plan and manage work in this project.' }
+        : clientScope ? { title: scopedClient?.name || (clientScope === 'unassigned' ? 'Unassigned projects' : 'Client unavailable'), description: 'Choose a project to open its task management workspace.' }
+        : pages[location.pathname] || pages['/clients'];
     let breadcrumbTitle = title;
     if (selected) {
         breadcrumbTitle = selected === 'new' ? 'New task' : 'Task details';
@@ -76,12 +93,12 @@ export default function App() {
     function setSelected(id, status = null) {
         if (id) {
             navigate(
-                { pathname: `/tasks/${id}`, search: location.search },
+                { pathname: `${taskBase}/${id}`, search: withoutParentSelection(location.search) },
                 { state: { initialStatus: status } },
             );
         }
         else {
-            navigate({ pathname: '/tasks', search: location.search });
+            navigate({ pathname: taskBase, search: withoutParentSelection(location.search) });
         }
     }
 
@@ -91,16 +108,21 @@ export default function App() {
 
     useEffect(() => {
         setTaskEditing({ dirty: false, saving: false });
-        setCreatingProject(false);
         if (auth.status !== 'authenticated') {
             return;
         }
         dispatch(loadWorkspace());
         dispatch(loadPresentation());
+        for (const discipline of ['Development', 'Drafting']) {
+            dispatch(loadTaskColumns({ projectId: null, discipline }));
+        }
         dispatch(loadStatusSettings());
         const refresh = () => {
             dispatch(loadWorkspace());
             dispatch(loadPresentation());
+            for (const discipline of ['Development', 'Drafting']) {
+                dispatch(loadTaskColumns({ projectId: null, discipline }));
+            }
             dispatch(loadStatusSettings());
         };
         window.addEventListener('focus', refresh);
@@ -119,17 +141,18 @@ export default function App() {
         function createShortcut(event) {
             const editing = event.target.closest('input, textarea, select, [contenteditable="true"]');
             if (event.key.toLowerCase() === 'c' && !editing && !event.ctrlKey && !event.metaKey && !event.altKey &&
-                auth.user?.role === 'Administrator' && workspace.status === 'ready' && !selected &&
+                auth.user?.role === 'Administrator' && workspace.status === 'ready' && !selected && canCreateTask &&
+                (projectScope || location.pathname === '/tasks' || location.pathname === '/dashboard') &&
                 !document.querySelector('dialog[open]')) {
                 event.preventDefault();
-                navigate({ pathname: '/tasks/new', search: location.search });
+                navigate({ pathname: `${taskBase}/new`, search: withoutParentSelection(location.search) });
             }
         }
         window.addEventListener('keydown', createShortcut);
         return () => {
             window.removeEventListener('keydown', createShortcut);
         };
-    }, [auth.user?.role, workspace.status, selected, navigate, location.search]);
+    }, [auth.user?.role, workspace.status, selected, navigate, location.search, location.pathname, taskBase, projectScope, canCreateTask]);
 
     useEffect(() => {
         const timer = setTimeout(() => setToast(''), 4500);
@@ -172,7 +195,15 @@ export default function App() {
         return <LoginPage />;
     }
 
-    const calendarActive = location.pathname === '/tasks' && new URLSearchParams(location.search).get('view') === 'calendar';
+    const calendarActive = location.pathname === taskBase && new URLSearchParams(location.search).get('view') === 'calendar';
+    const taskDetails = selected ? (
+        <TaskPage key={`${projectScope || ''}:${selected}`} id={selected} projectScope={projectScope}
+            onClose={() => setSelected(null)} onEditingChange={setTaskEditing} onSaved={(message) => {
+                setToast(message);
+                dispatch(loadWorkspace());
+            }} />
+    ) : <Navigate to={taskBase} replace />;
+    const projectUnavailable = projectScope && projectScope !== 'general' && !scopedProject;
 
     return (
         <div className="app-shell">
@@ -195,14 +226,11 @@ export default function App() {
                             <LayoutDashboard size={19} />
                             Dashboard
                         </NavLink>
-                        <NavLink to="/tasks">
+                        <Link to="/clients" className={taskManagementActive ? 'active' : ''}
+                            aria-current={taskManagementActive ? 'page' : undefined}>
                             <CheckSquare2 size={19} />
                             Task Management
-                        </NavLink>
-                        <NavLink to="/projects">
-                            <FolderOpen size={19} />
-                            Projects
-                        </NavLink>
+                        </Link>
                         <NavLink to="/notifications">
                             <Bell size={19} />
                             Notifications
@@ -215,6 +243,7 @@ export default function App() {
                         <div className="nav-label nav-section-label">ADMINISTRATION</div>
                         <nav aria-label="Administration">
                             <NavLink to="/labels"><Tags size={18} />Labels</NavLink>
+                            <NavLink to="/task-columns"><Columns3 size={18} />Task columns</NavLink>
                             <NavLink to="/board-presentation"><Columns3 size={18} />Board presentation</NavLink>
                             <NavLink to="/status-catalog"><Tags size={18} />Status catalog</NavLink>
                             <NavLink to="/discipline-statuses"><GitBranch size={18} />Discipline statuses</NavLink>
@@ -230,11 +259,21 @@ export default function App() {
                 <header className="topbar">
                     <div className="breadcrumb">
                         Workspace <span>/</span>
-                        <strong>{breadcrumbTitle}</strong>
+                        {clientScope || projectScope ? <>
+                            <Link to="/clients">Task Management</Link><span>/</span>
+                            {projectScope !== 'general' && <><Link to={`/clients/${scopedClient?.id || 'unassigned'}/projects`}>
+                                {scopedClient?.name || 'Unassigned projects'}</Link>{projectScope && <span>/</span>}</>}
+                            {projectScope && <>
+                                {selected ? <>
+                                    <Link to={taskBase}>{scopedProject?.name || (projectScope === 'general' ? 'General tasks' : 'Project unavailable')}</Link>
+                                    <span>/</span><strong>{breadcrumbTitle}</strong>
+                                </> : <strong>{scopedProject?.name || (projectScope === 'general' ? 'General tasks' : 'Project unavailable')}</strong>}
+                            </>}
+                        </> : <strong>{breadcrumbTitle}</strong>}
                     </div>
                     <form className="workspace-search" role="search" aria-label="Workspace task search" onSubmit={(event) => {
                         event.preventDefault();
-                        navigate({ pathname: '/tasks', search: serializeTaskQuery({ ...defaultTaskQuery, search: workspaceSearch.trim() }) });
+                        navigate({ pathname: taskBase, search: serializeTaskQuery({ ...defaultTaskQuery, search: workspaceSearch.trim() }) });
                     }}>
                         <Search size={16} aria-hidden="true" />
                         <input ref={workspaceSearchRef} type="search" aria-label="Search workspace tasks" placeholder="Search tasks, projects or people"
@@ -268,7 +307,7 @@ export default function App() {
                         Could not refresh discipline statuses. Reload them before changing task status.
                         <button type="button" className="text-button" onClick={() => dispatch(loadStatusSettings())}>Retry statuses</button>
                     </div>}
-                    {!selected && !['/labels', '/board-presentation', '/discipline-statuses', '/status-catalog'].includes(location.pathname) && (
+                    {!selected && !['/labels', '/task-columns', '/board-presentation', '/discipline-statuses', '/status-catalog'].includes(location.pathname) && (
                         <div className="page-heading">
                             <div>
                                 <span className="eyebrow">YOUR WORKSPACE</span>
@@ -276,29 +315,22 @@ export default function App() {
                                 <p>{description}</p>
                             </div>
                             <div className="page-actions">
-                                {auth.user.role === 'Administrator' && title === 'Projects' && (
-                                    <button
-                                        className="button"
-                                        disabled={!workspace.hasLoaded}
-                                        onClick={() => setCreatingProject(true)}
-                                    >
-                                        <FolderPlus size={17} />
-                                        New project
-                                    </button>
-                                )}
                                 <button
                                     className="button"
                                     disabled={workspace.status === 'loading'}
                                     onClick={() => {
                                         dispatch(loadWorkspace());
                                         dispatch(loadPresentation());
+                                        for (const discipline of ['Development', 'Drafting']) {
+                                            dispatch(loadTaskColumns({ projectId: projectScope && projectScope !== 'general' ? projectScope : null, discipline }));
+                                        }
                                         dispatch(loadStatusSettings());
                                     }}
                                 >
                                     <RefreshCw size={15} />
                                     <span>Refresh</span>
                                 </button>
-                                {auth.user.role === 'Administrator' && (
+                                {auth.user.role === 'Administrator' && canCreateTask && (projectScope || location.pathname === '/tasks' || location.pathname === '/dashboard') && (
                                     <button
                                         className="button primary"
                                         disabled={workspace.status !== 'ready'}
@@ -337,28 +369,25 @@ export default function App() {
                                 ? <StatusCatalogPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
                             <Route path="/discipline-statuses" element={auth.user.role === 'Administrator'
                                 ? <StatusSettingsPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
+                            <Route path="/task-columns" element={auth.user.role === 'Administrator'
+                                ? <TaskColumnsAdministration onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
                             <Route path="/board-presentation" element={auth.user.role === 'Administrator'
-                                ? <WorkflowPresentationPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
+                                ? <BoardPresentationAdministration onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
                             <Route path="/labels" element={auth.user.role === 'Administrator'
                                 ? <LabelsPage onEditingChange={setTaskEditing} /> : <Navigate to="/tasks" replace />} />
                             <Route path="/tasks" element={<TasksPage onOpen={setSelected} />} />
-                            <Route path="/tasks/:taskId" element={selected ? (
-                                <TaskPage
-                                    key={selected}
-                                    id={selected}
-                                    initialStatus={location.state?.initialStatus || null}
-                                    onClose={() => setSelected(null)}
-                                    onEditingChange={setTaskEditing}
-                                    onSaved={(message) => {
-                                        setToast(message);
-                                        dispatch(loadWorkspace());
-                                    }}
-                                />
-                            ) : <Navigate to="/tasks" replace />} />
+                            <Route path="/tasks/:taskId" element={taskDetails} />
+                            <Route path="/clients" element={<ClientsPage />} />
+                            <Route path="/clients/:clientId/projects" element={<ClientProjectsPage key={clientScope} />} />
+                            <Route path="/projects/:projectId/tasks" element={projectUnavailable
+                                ? <div className="empty panel">Project unavailable. <Link to="/clients">Back to clients</Link></div>
+                                : <TasksPage key={projectScope} projectScope={projectScope} onOpen={setSelected} />} />
+                            <Route path="/projects/:projectId/tasks/:taskId" element={projectUnavailable
+                                ? <div className="empty panel">Project unavailable. <Link to="/clients">Back to clients</Link></div> : taskDetails} />
                             <Route path="/dashboard" element={<Dashboard onOpen={setSelected} />} />
-                            <Route path="/projects" element={<ProjectsPage />} />
+                            <Route path="/projects" element={<ClientProjectsPage />} />
                             <Route path="/notifications" element={<NotificationsPage />} />
-                            <Route path="*" element={<Navigate to="/tasks" replace />} />
+                            <Route path="*" element={<Navigate to="/clients" replace />} />
                         </Routes>
                     )}
                     {workspace.status === 'loading' && (
@@ -369,27 +398,18 @@ export default function App() {
                 </main>
             </div>
             <nav className="mobile-bottom-nav" aria-label="Mobile workspace">
-                <Link to="/tasks" aria-current={location.pathname.startsWith('/tasks') && !calendarActive ? 'page' : undefined}
-                    className={location.pathname.startsWith('/tasks') && !calendarActive ? 'active' : ''}><CheckSquare2 size={20} /><span>Tasks</span></Link>
-                <Link to="/tasks?view=calendar" aria-current={calendarActive ? 'page' : undefined}
+                <Link to="/clients" className={taskManagementActive && !calendarActive ? 'active' : ''}
+                    aria-current={taskManagementActive && !calendarActive ? 'page' : undefined}>
+                    <CheckSquare2 size={20} /><span>Task Management</span>
+                </Link>
+                <Link to={`${taskBase}?view=calendar`} aria-current={calendarActive ? 'page' : undefined}
                     className={calendarActive ? 'active' : ''}><CalendarDays size={20} /><span>Calendar</span></Link>
-                <NavLink to="/projects"><FolderOpen size={20} /><span>Projects</span></NavLink>
                 <NavLink to="/notifications"><Bell size={20} /><span>Notifications{workspace.notifications.unreadCount > 0 ? ` (${workspace.notifications.unreadCount})` : ''}</span></NavLink>
             </nav>
             {toast && (
                 <div className="toast" role="status">
                     ✓ {toast}
                 </div>
-            )}
-            {creatingProject && (
-                <ProjectDialog
-                    onClose={() => setCreatingProject(false)}
-                    onCreated={(project) => {
-                        setCreatingProject(false);
-                        setToast(`${project.name} created.`);
-                        dispatch(loadWorkspace());
-                    }}
-                />
             )}
         </div>
     );

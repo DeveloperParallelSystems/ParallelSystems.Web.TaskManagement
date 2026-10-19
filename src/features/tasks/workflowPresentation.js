@@ -56,7 +56,7 @@ export function reorderPresentation(items, index, offset) {
     return result;
 }
 
-function readPage(page) {
+export function readPresentationPage(page) {
     if (page?.catalog && (!Number.isSafeInteger(page.catalogVersion) || page.catalogVersion < 1 ||
         !Array.isArray(page.catalog) || !page.catalog.length ||
         page.catalog.some((item) => !item || typeof item.code !== 'string' || !item.code || typeof item.name !== 'string' || !item.name.trim()) ||
@@ -72,12 +72,12 @@ function readPage(page) {
 
 export const loadPresentation = createAsyncThunk('presentation/load', async (_, { signal, rejectWithValue }) => {
     try {
-        return readPage(await request('/board-presentation', { signal }));
+        return readPresentationPage(await request('/board-presentation', { signal }));
     }
     catch (error) {
         if (error.status === 404) {
             try {
-                return { ...readPage(await request('/workflow-presentation', { signal })), canManage: false, supported: false };
+                return { ...readPresentationPage(await request('/workflow-presentation', { signal })), canManage: false, supported: false };
             }
             catch (fallback) {
                 if (fallback.status !== 404) {
@@ -101,7 +101,7 @@ export const savePresentation = createAsyncThunk('presentation/save', async ({ v
         if (error) {
             throw new Error(error);
         }
-        return readPage(await request(catalogVersion ? '/board-presentation' : '/workflow-presentation', {
+        return readPresentationPage(await request(catalogVersion ? '/board-presentation' : '/workflow-presentation', {
             method: 'PUT', body: { version, ...(catalogVersion ? { catalogVersion } : {}), groups: columns }, signal,
         }));
     }

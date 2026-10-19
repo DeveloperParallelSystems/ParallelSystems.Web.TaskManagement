@@ -1,11 +1,11 @@
 import { useId, useState } from 'react';
 import { initials, staffOptionLabel } from './workflow';
 
-export default function TaskContributors({ task, people }) {
+export default function TaskContributors({ task, people, columns = ['originalAssignee', 'qa'] }) {
     const roles = [
-        { key: 'dev', description: 'Developer / original assignee', id: task.originalAssigneeId },
-        { key: 'qa', description: 'Reviewer / QA', id: task.reviewerId },
-    ].filter((role) => role.id).map((role) => ({
+        { key: 'dev', field: 'originalAssignee', description: 'Developer / original assignee', id: task.originalAssigneeId },
+        { key: 'qa', field: 'qa', description: 'Reviewer / QA', id: task.reviewerId },
+    ].filter((role) => role.id && columns.includes(role.field)).map((role) => ({
         ...role,
         fallbackName: role.id === task.assigneeId ? task.assigneeName : null,
     }));

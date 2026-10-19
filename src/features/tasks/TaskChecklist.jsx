@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, CheckSquare, Pencil, RefreshCw, Trash2 } from 'luci
 import { loadWorkspace } from '../../app/store';
 import { deleteChecklistItem, loadTaskChecklist, reorderChecklist, saveChecklistItem } from './checklistState';
 import { blankChecklistEditor as blankEditor, finishChecklistReload } from './checklistEditor';
+import TaskPanelHeading from './TaskPanelHeading';
 
 export function ChecklistProgress({ summary, compact = false }) {
     if (!summary || (compact && summary.total === 0)) {
@@ -171,10 +172,11 @@ export default function TaskChecklist({ taskId, onEditingChange, onHistoryChange
     return (
         <section className="panel task-checklist" aria-labelledby="task-checklist-heading" aria-busy={busy}>
             <div className="panel-heading">
-                <h2 id="task-checklist-heading">Checklist</h2>
+                <TaskPanelHeading id="task-checklist-heading" icon={CheckSquare} title="Checklist">Track the progress of this task.</TaskPanelHeading>
                 <button type="button" className="text-button" disabled={busy || checklist?.status === 'loading'}
+                    aria-label="Reload checklist" title="Reload checklist"
                     onClick={() => dirty ? setConfirmation({ kind: 'reload' }) : reload()}>
-                    <RefreshCw size={14} /> Reload checklist
+                    <RefreshCw size={15} />
                 </button>
             </div>
             {error && <div className="error" role="alert">{error.message}</div>}
@@ -183,7 +185,7 @@ export default function TaskChecklist({ taskId, onEditingChange, onHistoryChange
             {checklist?.hasLoaded && !unavailable && (
                 <>
                     <ChecklistProgress summary={checklist.summary} />
-                    {!checklist.items.length && <p className="muted">No checklist items yet.</p>}
+                    {!checklist.items.length && <p className="muted checklist-empty">No checklist items yet.</p>}
                     <ul className="checklist-items">
                         {checklist.items.map((item, index) => (
                             <li key={item.id} className={item.completed ? 'checklist-item completed' : 'checklist-item'}>
@@ -215,6 +217,7 @@ export default function TaskChecklist({ taskId, onEditingChange, onHistoryChange
                         <label className="field">
                             <span>{editor.id ? 'Edit checklist item' : 'New checklist item'}</span>
                             <input ref={inputRef} value={editor.title} maxLength={200} required disabled={busy}
+                                placeholder="Add a new checklist item…"
                                 onChange={(event) => setEditor((current) => ({ ...current, title: event.target.value }))} />
                         </label>
                         <div className="checklist-editor-actions">

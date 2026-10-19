@@ -1,29 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBlocker, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Clock3, RotateCcw, Link } from 'lucide-react';
+import { ArrowLeft, Save, Clock3, RotateCcw, Link, FileText, Settings2, CheckSquare } from 'lucide-react';
 import { request } from '../../app/api';
 import { saveTask } from '../../app/store';
 import { disciplines, staffOptionLabel } from './workflow';
 import { taskInput } from './taskActions';
-import { taskStatusName, taskStatusTone } from './taskWorkflow';
-import TaskStatusControl from './TaskStatusControl';
-import { loadStatusSettings } from './liveStatuses.js';
+import { taskStatusName } from './taskWorkflow';
+import { allowedDisciplineStatuses, loadStatusSettings } from './liveStatuses.js';
 import './task-detail-design.css';
-import { shouldBlockTaskNavigation } from './taskNavigation';
+import { shouldBlockTaskNavigation, taskPathAfterSave, withoutParentSelection } from './taskNavigation';
 import TaskDiscussion from './TaskDiscussion';
 import TaskPageTabs from './TaskPageTabs';
+import TaskPanelHeading from './TaskPanelHeading';
 import TaskAttachments from './TaskAttachments';
 import TaskChecklist from './TaskChecklist';
 import TaskLabels from './TaskLabels';
-import TaskDependencies from './TaskDependencies';
-import { mergeDependencyVersion } from './dependencyState.js';
+import TaskLinkedTickets from './TaskLinkedTickets';
+import { mergeLinkedTicketVersion } from './linkedTicketState.js';
+import TaskCustomFields from './TaskCustomFields';
+import { emptyCustomFields, loadCustomFields } from './customFields';
+import { customTaskPayload, projectFieldDraft } from './customFieldValues';
+import { emptyTaskColumns, loadTaskColumns, taskColumnKey } from './taskColumns';
 
 const emptyTask = {
     title: '',
     description: '',
     discipline: disciplines[0],
     projectId: '',
+    parentTaskId: '',
     priority: 'Medium',
     dueDate: '',
     status: 'To Do',
@@ -35,9 +40,9 @@ const emptyTask = {
     version: 0,
 };
 
-export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
+export default function TaskPage({ id, onClose, onSaved, onEditingChange, projectScope = null }) {
     const dispatch = useDispatch();
-    const { people, projects } = useSelector((state) => state.workspace);
+    const { people, projects, tasks = [] } = useSelector((state) => state.workspace);
     const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
     const statusSettingsError = useSelector((state) => state.workspace.statusSettings?.error);
     const administrator = useSelector((state) => state.auth.user.role === 'Administrator');
@@ -45,7 +50,11 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
     const confirmRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
-    const [values, setValues] = useState(emptyTask);
+    const [values, setValues] = useState(() => ({
+        ...emptyTask,
+        projectId: projectScope && projectScope !== 'general' ? projectScope : '',
+        parentTaskId: id === 'new' ? new URLSearchParams(location.search).get('parentTaskId') || '' : '',
+    }));
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(id !== 'new');
     const [saving, setSaving] = useState(false);
@@ -53,27 +62,70 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
     const [reload, setReload] = useState(0);
     const [dirty, setDirty] = useState(false);
     const [linkMessage, setLinkMessage] = useState('');
-    const [createdId, setCreatedId] = useState(null);
+    const [savedPath, setSavedPath] = useState(null);
     const [discussionEditing, setDiscussionEditing] = useState({ dirty: false, saving: false });
     const [attachmentEditing, setAttachmentEditing] = useState({ dirty: false, saving: false });
     const [checklistEditing, setChecklistEditing] = useState({ dirty: false, saving: false });
     const [labelEditing, setLabelEditing] = useState({ dirty: false, saving: false });
-    const [dependencyEditing, setDependencyEditing] = useState({ dirty: false, saving: false });
+    const [linkedTicketEditing, setLinkedTicketEditing] = useState({ dirty: false, saving: false });
     const historyRequest = useRef(null);
     const [activeTab, setActiveTab] = useState('details');
-    const [workflowEditing, setWorkflowEditing] = useState({ dirty: false, saving: false });
     const [newWorkflowReady, setNewWorkflowReady] = useState(false);
-    const unsaved = dirty || discussionEditing.dirty || attachmentEditing.dirty || checklistEditing.dirty || labelEditing.dirty || dependencyEditing.dirty || workflowEditing.dirty;
-    const pendingSave = saving || discussionEditing.saving || attachmentEditing.saving || checklistEditing.saving || labelEditing.saving || dependencyEditing.saving || workflowEditing.saving;
+    const [customDrafts, setCustomDrafts] = useState({});
+    const [customDraftVersions, setCustomDraftVersions] = useState({});
+    const [customReloading, setCustomReloading] = useState(false);
+    const customProjectId = projects.some((project) => project.id === values.projectId) ? values.projectId : null;
+    const customResource = useSelector((state) => state.workspace.customFields?.[customProjectId] || emptyCustomFields);
+    const columnRevision = useSelector((state) => state.workspace.taskColumnsRevision || 0);
+    const columnEpoch = useSelector((state) => state.workspace.taskColumnsEpoch || 0);
+    const columnResource = useSelector((state) => state.workspace.taskColumns?.[
+        taskColumnKey({ projectId: customProjectId, discipline: values.discipline })] || emptyTaskColumns);
+    const columnsReady = Boolean(columnResource.data && !columnResource.error && !columnResource.invalidated && columnResource.data.version === columnRevision);
+    const visibleColumns = columnsReady ? columnResource.data.columns : [];
+    const visibleCustomFields = visibleColumns.map((column) => customResource.data?.fields.find(
+        (field) => !field.isArchived && column === `custom:${field.id.toLowerCase()}`)).filter(Boolean);
+    const customValues = projectFieldDraft(customDrafts, values.projectId, details?.task);
+    const customReady = Boolean(customResource.data && !customResource.error && !customResource.invalidated && customResource.data.version === columnRevision);
+    const customStale = Object.hasOwn(customDraftVersions, values.projectId) && customDraftVersions[values.projectId] !== columnRevision;
+    const customSaveBlocked = Boolean(administrator && customProjectId && (!customReady || customStale));
+    const unsaved = dirty || discussionEditing.dirty || attachmentEditing.dirty || checklistEditing.dirty || labelEditing.dirty || linkedTicketEditing.dirty;
+    const pendingSave = saving || customReloading || discussionEditing.saving || attachmentEditing.saving || checklistEditing.saving || labelEditing.saving || linkedTicketEditing.saving;
     const editable = id === 'new' ? administrator : details?.canEditDetails;
     const allowedStatuses = id === 'new' ? ['To Do'] : details?.allowedStatuses || [];
-    let saveMessage = id === 'new' ? 'Not saved yet' : 'Task details saved';
-    if (dirty) {
+    const statusChoices = allowedDisciplineStatuses(statusSettings, values.discipline).filter((status) =>
+        status.code === values.status || administrator || allowedStatuses.includes(status.code));
+    const disciplineChanged = Boolean(details && values.discipline !== details.task.discipline);
+    const disciplineStatusInvalid = disciplineChanged && !statusChoices.some((status) => status.code === values.status);
+    const statusDisplayName = statusSettings?.catalog.find((status) => status.code === values.status)?.name || values.status;
+    const saveDisabled = pendingSave || customSaveBlocked || disciplineStatusInvalid || linkedTicketEditing.dirty || loading ||
+        (!details && id !== 'new') || (id === 'new' && !newWorkflowReady) || (id !== 'new' && !dirty && !labelEditing.dirty);
+    let saveMessage = id === 'new' ? 'Not saved yet' : 'All changes saved';
+    if (dirty || labelEditing.dirty) {
         saveMessage = 'Unsaved changes';
     }
     const blocker = useBlocker(({ currentLocation, nextLocation }) =>
         shouldBlockTaskNavigation({ dirty: unsaved, saving: pendingSave }, currentLocation, nextLocation),
     );
+
+    useEffect(() => {
+        const refresh = () => {
+            dispatch(loadTaskColumns({ projectId: customProjectId, discipline: values.discipline }));
+            if (customProjectId) {
+                dispatch(loadCustomFields(customProjectId));
+            }
+        };
+        refresh();
+        window.addEventListener('focus', refresh);
+        const timer = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                refresh();
+            }
+        }, 60000);
+        return () => {
+            window.removeEventListener('focus', refresh);
+            window.clearInterval(timer);
+        };
+    }, [dispatch, customProjectId, values.discipline, columnRevision, columnEpoch]);
 
     useEffect(() => {
         if (id !== 'new' || newWorkflowReady || !statusSettings) {
@@ -134,10 +186,10 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
     }, [unsaved, pendingSave, onClose]);
 
     useEffect(() => {
-        if (createdId && !dirty && !saving && blocker.state === 'unblocked') {
-            navigate({ pathname: `/tasks/${createdId}`, search: location.search }, { replace: true });
+        if (savedPath && !dirty && !saving && blocker.state === 'unblocked') {
+            navigate({ pathname: savedPath, search: withoutParentSelection(location.search) }, { replace: true });
         }
-    }, [createdId, dirty, saving, blocker.state, navigate, location.search]);
+    }, [savedPath, dirty, saving, blocker.state, navigate, location.search]);
 
     useEffect(() => {
         if (id === 'new') {
@@ -149,6 +201,9 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
         setError(null);
         request(`/tasks/${id}`, { signal: controller.signal })
             .then((result) => {
+                if (projectScope && (projectScope === 'general' ? Boolean(result.task.projectId) : result.task.projectId !== projectScope)) {
+                    throw new Error('This task is not in the selected project. Open it from its project or notification.');
+                }
                 setDetails(result);
                 const loaded = {
                     ...emptyTask,
@@ -161,6 +216,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                     releaseOwnerId: result.task.releaseOwnerId || '',
                 };
                 setValues(loaded);
+                setCustomDrafts({});
+                setCustomDraftVersions({});
                 setDirty(false);
                 setLoading(false);
             })
@@ -173,7 +230,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
         return () => {
             controller.abort();
         };
-    }, [id, reload]);
+    }, [id, reload, projectScope]);
 
     useEffect(() => {
         if (id === 'new' || !statusSettings?.version) {
@@ -195,6 +252,13 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
     }, [id, statusSettings?.version]);
 
     function change(name, value) {
+        if (name === 'discipline' && !administrator) {
+            return;
+        }
+        if (name === 'projectId' && Object.hasOwn(customDrafts, values.projectId) &&
+            !window.confirm('Switch projects? Your project-field edits stay in this form. Saving applies only to the selected project.')) {
+            return;
+        }
         setDirty(true);
         if (id === 'new' && name === 'discipline') {
             setNewWorkflowReady(false);
@@ -206,6 +270,41 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
             }
             return next;
         });
+    }
+
+    function changeCustomField(fieldId, value) {
+        if (!customReady || !columnsReady || customStale || !administrator || !editable) {
+            return;
+        }
+        setDirty(true);
+        setCustomDrafts((current) => ({ ...current, [values.projectId]: { ...current[values.projectId], [fieldId]: value } }));
+        setCustomDraftVersions((current) => ({ ...current, [values.projectId]: customResource.data.version }));
+    }
+
+    async function reloadCustomFields() {
+        if (customReloading || !customProjectId || customResource.readId) {
+            return;
+        }
+        if (customStale && !window.confirm('Reload project fields? Values for fields no longer active will not be submitted. Other task edits will be kept.')) {
+            return;
+        }
+        setCustomReloading(true);
+        try {
+            const page = await dispatch(loadCustomFields(customProjectId)).unwrap();
+            await dispatch(loadTaskColumns({ projectId: customProjectId, discipline: values.discipline })).unwrap();
+            if (Object.hasOwn(customDraftVersions, customProjectId)) {
+                setCustomDraftVersions((current) => ({ ...current, [customProjectId]: page.version }));
+                const active = new Set(page.fields.filter((field) => !field.isArchived).map((field) => field.id));
+                setCustomDrafts((current) => ({ ...current, [customProjectId]: Object.fromEntries(
+                    Object.entries(current[customProjectId] || {}).filter(([fieldId]) => active.has(fieldId))) }));
+            }
+        }
+        catch (failure) {
+            setError(failure);
+        }
+        finally {
+            setCustomReloading(false);
+        }
     }
 
     async function refreshHistory() {
@@ -249,8 +348,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
         if (pendingSave) {
             return;
         }
-        if (!(dirty || labelEditing.dirty || dependencyEditing.dirty || workflowEditing.dirty) ||
-            window.confirm('Reload the latest task and discard unsaved task, action, label and dependency changes?')) {
+        if (!(dirty || labelEditing.dirty || linkedTicketEditing.dirty) ||
+            window.confirm('Reload the latest task and discard unsaved task, action, label and linked-ticket changes?')) {
             setReload((value) => value + 1);
         }
     }
@@ -262,21 +361,32 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
 
     async function submit(event) {
         event.preventDefault();
-        if (workflowEditing.dirty || workflowEditing.saving || labelEditing.dirty || labelEditing.saving || dependencyEditing.dirty || dependencyEditing.saving || (id === 'new' && !newWorkflowReady)) {
+        if (pendingSave || customSaveBlocked || disciplineStatusInvalid || linkedTicketEditing.dirty || linkedTicketEditing.saving || (id === 'new' && !newWorkflowReady)) {
             return;
         }
         setError(null);
         setSaving(true);
-        const payload = taskInput(values, { note: values.note });
+        const payload = taskInput(values, { note: '' });
+        if (administrator && editable && labelEditing.dirty) {
+            payload.labelIds = labelEditing.labelIds;
+        }
+        if (id === 'new') {
+            payload.parentTaskId = values.parentTaskId || null;
+        }
         for (const field of ['projectId', 'assigneeId', 'reviewerId', 'releaseOwnerId', 'dueDate']) {
             payload[field] = payload[field] || null;
         }
         try {
+            Object.assign(payload, customTaskPayload({ projectId: customProjectId, page: customResource.data,
+                revision: columnRevision, values: customDrafts[values.projectId] || {}, administrator: administrator && Boolean(editable),
+                error: customResource.error, invalidated: customResource.invalidated }));
             const saved = await dispatch(saveTask({ id: id === 'new' ? null : id, values: payload })).unwrap();
             setDirty(false);
+            setCustomDrafts({});
+            setCustomDraftVersions({});
             setSaving(false);
-            if (id === 'new') {
-                setCreatedId(saved.id);
+            if (id === 'new' || (projectScope && (payload.projectId || 'general') !== projectScope)) {
+                setSavedPath(taskPathAfterSave(saved, payload.projectId, projectScope));
             }
             else {
                 setReload((value) => value + 1);
@@ -295,7 +405,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                 <span>{label}</span>
                 <select form="task-details-form"
                     value={values[name]}
-                    disabled={disabled || saving || workflowEditing.saving}
+                    disabled={disabled || saving}
                     required={name === 'originalAssigneeId'}
                     onChange={(event) => change(name, event.target.value)}
                 >
@@ -334,7 +444,6 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                     <div className="task-detail-meta">
                         <span className="eyebrow">{details?.task.code || (id === 'new' ? 'NEW TASK' : 'TASK')}</span>
                         {details && <>
-                            <span className={`badge ${taskStatusTone(details.task)}`}>{taskStatusName(details.task)}</span>
                             <span className={`task-detail-priority priority-${details.task.priority?.toLowerCase()}`}>
                                 {details.task.priority} priority
                             </span>
@@ -345,14 +454,24 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                     </h1>
                     {linkMessage && <p role="status">{linkMessage}</p>}
                 </div>
-                {id !== 'new' && (
+                <div className="task-header-actions">
+                    <span className="muted task-save-state" role="status">{saveMessage}</span>
+                    <button type="submit" form="task-details-form" className="button primary" disabled={saveDisabled}
+                        onClick={() => setActiveTab('details')}>
+                        <Save size={16} />{saving ? 'Saving…' : 'Save'}
+                    </button>
+                    {id !== 'new' && (
                     <button type="button" className="button task-copy-link" onClick={copyLink}>
                         <Link size={15} /> Copy task link
                     </button>
-                )}
+                    )}
+                </div>
             </div>
-            <div className="task-detail-tabs">
-                <TaskPageTabs value={activeTab} onChange={setActiveTab} attachmentsDisabled={id === 'new'} />
+            <div className="task-detail-toolbar">
+                <p className="task-page-subtitle">Create and organize a task with all the necessary details.</p>
+                <div className="task-detail-tabs">
+                    <TaskPageTabs value={activeTab} onChange={setActiveTab} attachmentsDisabled={id === 'new'} />
+                </div>
             </div>
             <div id="task-details-panel" className="task-tab-panel" role="tabpanel"
                 aria-labelledby="task-details-tab" tabIndex={0} hidden={activeTab !== 'details'}>
@@ -382,14 +501,39 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                                         <>
                                             {!editable && (
                                                 <p className="hint">
-                                                    You can add notes and change the status when your assignment permits.
+                                                    Use Discussion for updates. You can change the status when your assignment permits.
                                                 </p>
                                             )}
                                             <div className="task-page-columns">
                                                 <section className="panel task-details-panel" aria-labelledby="task-details-heading">
-                                                    <h2 id="task-details-heading">Task details</h2>
-                                                    <fieldset disabled={!editable || saving || labelEditing.saving || dependencyEditing.saving || workflowEditing.saving} className="form-grid">
-                                                        <p className="hint full">Assign staff from Staff Information. Staff without an account can be assigned now.</p>
+                                                    <TaskPanelHeading id="task-details-heading" icon={FileText} title="Task information">Provide the essential details for this task.</TaskPanelHeading>
+                                                    {!loading && (details || id === 'new') && <section className="task-status-owner" aria-label="Status and current owner">
+                                                        <label className="field"><span>Status</span>
+                                                            <select form="task-details-form" aria-label="Status" value={disciplineStatusInvalid ? '' : values.status}
+                                                                required={disciplineChanged} aria-invalid={disciplineStatusInvalid || undefined}
+                                                                aria-describedby={disciplineStatusInvalid ? 'task-discipline-status-error' : undefined}
+                                                                disabled={saving || id === 'new' || !statusSettings || (!administrator && !allowedStatuses.some((status) => status !== details?.task.status))}
+                                                                onChange={(event) => change('status', event.target.value)}>
+                                                                {disciplineStatusInvalid && <option value="" disabled>Select a valid status</option>}
+                                                                {!disciplineChanged && !statusChoices.some((status) => status.code === values.status) &&
+                                                                    <option value={values.status} disabled>{details?.task.statusName || values.status}</option>}
+                                                                {statusChoices.map((status) => <option key={status.code} value={status.code}>{status.name}</option>)}
+                                                            </select>
+                                                            {disciplineStatusInvalid && <span className="error" id="task-discipline-status-error" role="alert">
+                                                                {statusDisplayName} isn’t available in {values.discipline}. Select a valid status before saving.
+                                                            </span>}
+                                                        </label>
+                                                        {personSelect('assigneeId', 'Assigned To', !editable)}
+                                                        {!statusSettings && <p className="error" role="status">{statusSettingsError?.message || 'Loading statuses…'}
+                                                            <button type="button" className="text-button" onClick={() => dispatch(loadStatusSettings())}>Reload statuses</button>
+                                                        </p>}
+                                                    </section>}
+                                                    {!columnsReady && <p className={columnResource.error ? 'error' : 'hint'} role="status">
+                                                        {columnResource.error?.message || 'Loading current task field visibility…'} Optional fields will appear when the configuration is available.
+                                                        <button type="button" className="text-button" disabled={pendingSave || Boolean(columnResource.readId)}
+                                                            onClick={() => dispatch(loadTaskColumns({ projectId: customProjectId, discipline: values.discipline }))}>Reload task columns</button>
+                                                    </p>}
+                                                    <fieldset disabled={!editable || saving || labelEditing.saving || linkedTicketEditing.saving} className="form-grid">
                                                         <label className="field full">
                                                             <span>Task title</span>
                                                             <input form="task-details-form"
@@ -405,19 +549,22 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                                                             <span>Discipline</span>
                                                             <select form="task-details-form"
                                                                 value={values.discipline}
-                                                                disabled={id !== 'new' && Boolean(values.workflow)}
+                                                                disabled={!administrator || !editable}
                                                                 onChange={(event) => change('discipline', event.target.value)}
                                                             >
                                                                 {disciplines.map((discipline) => <option key={discipline}>{discipline}</option>)}
                                                             </select>
+                                                            {disciplineChanged && <span className="hint">Assigned To is unchanged. Fields follow the selected discipline; hidden values are preserved.</span>}
                                                         </label>
                                                         <label className="field">
                                                             <span>Project</span>
                                                             <select form="task-details-form"
                                                                 value={values.projectId}
+                                                                disabled={id === 'new' && Boolean(projectScope)}
                                                                 onChange={(event) => change('projectId', event.target.value)}
                                                             >
                                                                 <option value="">General · no project</option>
+                                                                {values.projectId && !customProjectId && <option value={values.projectId}>Current project unavailable</option>}
                                                                 {projects.map((project) => (
                                                                     <option key={project.id} value={project.id}>
                                                                         {project.name}
@@ -444,9 +591,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                                                                 onChange={(event) => change('dueDate', event.target.value)}
                                                             />
                                                         </label>
-                                                        {personSelect('originalAssigneeId', 'Original assignee')}
-                                                        {values.workflow?.definition.mode !== 'Simple' && personSelect('reviewerId', 'Reviewer / QA')}
-                                                        {values.workflow?.definition.mode !== 'Simple' && personSelect('releaseOwnerId', 'Release owner')}
+                                                        {(id === 'new' || visibleColumns.includes('originalAssignee')) && personSelect('originalAssigneeId', 'Original assignee')}
+                                                        {(id === 'new' || visibleColumns.includes('qa')) && values.workflow?.definition.mode !== 'Simple' && personSelect('reviewerId', 'Reviewer / QA')}
                                                         <label className="field full">
                                                             <span>Description</span>
                                                             <textarea form="task-details-form"
@@ -459,38 +605,35 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                                                                 placeholder="Describe the work and what a successful result looks like…"
                                                             />
                                                         </label>
+                                                        {id === 'new' && <label className="field full">
+                                                            <span>Parent ticket (optional)</span>
+                                                            <select form="task-details-form" value={values.parentTaskId}
+                                                                onChange={(event) => change('parentTaskId', event.target.value)}>
+                                                                <option value="">No parent ticket</option>
+                                                                {values.parentTaskId && !tasks.some((task) => task.id === values.parentTaskId) &&
+                                                                    <option value={values.parentTaskId}>Selected parent unavailable — choose another or clear it</option>}
+                                                                {[
+                                                                    { label: 'This project', items: tasks.filter((task) => (task.projectId || '') === values.projectId) },
+                                                                    { label: 'Other projects and general tasks', items: tasks.filter((task) => (task.projectId || '') !== values.projectId) },
+                                                                ].filter((group) => group.items.length).map((group) => <optgroup key={group.label} label={group.label}>
+                                                                    {group.items.map((task) => <option key={task.id} value={task.id}>{task.code} · {task.title}</option>)}
+                                                                </optgroup>)}
+                                                            </select>
+                                                            <span className="hint">Links organize work. Status and owner remain independent.</span>
+                                                        </label>}
                                                     </fieldset>
                                                 </section>
                                             </div>
                                         </>
                                     )}
                                 </div>
-                                {(details || id === 'new') && (
-                                    <div className="task-page-footer">
-                                        <span className="muted" role="status">
-                                            {saveMessage}
-                                        </span>
-                                        <button type="button" className="button" disabled={pendingSave} onClick={close}>
-                                            Back to tasks
-                                        </button>
-                                        <button
-                                            className="button primary"
-                                            disabled={saving || workflowEditing.dirty || workflowEditing.saving || labelEditing.dirty || labelEditing.saving || dependencyEditing.dirty || dependencyEditing.saving || (!details && id !== 'new') || (id === 'new' && !newWorkflowReady)}
-                                        >
-                                            <Save size={16} />
-                                            {saving ? 'Saving…' : 'Save task'}
-                                        </button>
-                                    </div>
-                                )}
                             </form>
                         )}
-                        {labelEditing.dirty && <p className="hint">Save or cancel label changes before saving task details.</p>}
-                        {dependencyEditing.dirty && <p className="hint">Add or cancel the dependency selection before saving task details or labels.</p>}
-                        {workflowEditing.dirty && <p className="hint">Apply or cancel the status change before saving task details, labels or dependencies.</p>}
+                        {linkedTicketEditing.dirty && <p className="hint">Link or cancel the ticket selection before saving task details or labels.</p>}
                         {id === 'new' && <section className="panel task-label-panel"><h2>Labels</h2>
                             <p className="muted">Save this task to assign labels.</p></section>}
-                        {!loading && details && <TaskLabels key={`labels-${id}`} task={details.task}
-                            disabled={saving || dependencyEditing.dirty || dependencyEditing.saving || workflowEditing.dirty || workflowEditing.saving}
+                        {!loading && details && <TaskLabels key={`labels-${id}`} task={details.task} integrated
+                            disabled={saving || linkedTicketEditing.dirty || linkedTicketEditing.saving}
                             onEditingChange={setLabelEditing} onFailure={setError}
                             onSaved={(result, expectedVersion) => {
                                 setDetails((current) => current ? { ...current, task: { ...current.task, ...result } } : current);
@@ -499,49 +642,42 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                             }} />}
                         {id !== 'new' && <TaskDiscussion taskId={id} onEditingChange={setDiscussionEditing} />}
                     </div>
-                    <aside className="task-detail-side" aria-label="Status and task planning">
-                        {!statusSettings && <section className="panel" role="status">
-                            <h2>Status choices unavailable</h2>
-                            <p>{statusSettingsError?.message || 'Loading the discipline’s statuses…'}</p>
-                            <button type="button" className="button" onClick={() => dispatch(loadStatusSettings())}>
-                                Reload statuses
-                            </button>
-                        </section>}
-                        {statusSettings && !loading && (details || id === 'new') && <TaskStatusControl
-                            task={details?.task || null} allowedStatuses={allowedStatuses} settings={statusSettings}
-                            disabled={dirty || saving || labelEditing.dirty || labelEditing.saving || dependencyEditing.dirty || dependencyEditing.saving}
-                            onEditingChange={setWorkflowEditing} onReload={reloadTask} onChanged={() => {
-                                setReload((value) => value + 1);
-                                onSaved('Task status changed.');
-                            }} />}
-                        {!loading && (details || id === 'new') && <section className="panel task-assignment-panel"
-                            aria-labelledby="task-assignment-heading">
-                            <h2 id="task-assignment-heading">Assignment and activity</h2>
-                            <div className="form-grid">
-                                {personSelect('assigneeId', 'Assigned to · current owner', !editable)}
-                                <label className="field full"><span>Activity note</span>
-                                    <textarea form="task-details-form" rows={3} maxLength={4000}
-                                        disabled={saving || workflowEditing.saving}
-                                        value={values.note} onChange={(event) => change('note', event.target.value)}
-                                        placeholder="Add an update…" />
-                                </label>
+                    <aside className="task-detail-side" aria-label="Task planning">
+                        {!loading && (details || id === 'new') && values.projectId && <section className="panel task-project-fields-panel" aria-labelledby="task-custom-heading">
+                            <div className="panel-heading"><TaskPanelHeading id="task-custom-heading" icon={Settings2} title="Project fields">Additional fields specific to this project.</TaskPanelHeading>
+                                {customProjectId && <button type="button" className="text-button"
+                                    disabled={pendingSave || Boolean(customResource.readId)} onClick={reloadCustomFields} aria-label="Reload project fields" title="Reload project fields"><RotateCcw size={15} /></button>}
                             </div>
+                            {!customProjectId ? <p className="hint">Custom fields are unavailable for this historical project.</p>
+                                : !customReady ? <p className={customResource.error ? 'error' : 'hint'} role="status">
+                                    {customResource.error?.message || 'Loading current project fields…'} Reload project fields before saving.</p>
+                                : !columnsReady ? <p className={columnResource.error ? 'error' : 'hint'} role="status">
+                                    {columnResource.error?.message || 'Loading current task field visibility…'} Reload project fields to try again.</p>
+                                : <><TaskCustomFields fields={visibleCustomFields} values={customValues} people={people}
+                                    editable={administrator && Boolean(editable)} disabled={pendingSave || customStale}
+                                    onChange={changeCustomField} />
+                                    {customStale && <p className="error" role="alert">Project fields changed. Your draft is preserved. Reload project fields before saving.</p>}</>}
+                            {Object.keys(customDrafts).some((projectId) => projectId !== values.projectId) &&
+                                <p className="hint">Field edits for other projects are kept while this form is open. Saving applies only to the selected project.</p>}
+                            {administrator && <p className="hint task-project-save-hint">Only custom fields you edit are saved. Untouched values are preserved.</p>}
+                            {details?.task.projectId && details.task.projectId !== values.projectId &&
+                                <p className="hint">Existing values for the selected project are not loaded here. Save the project change and reload the task to view them.</p>}
                         </section>}
-                        {id === 'new' && <section className="panel task-checklist"><h2>Checklist</h2>
+                        {id === 'new' && <section className="panel task-checklist"><TaskPanelHeading icon={CheckSquare} title="Checklist">Track the progress of this task.</TaskPanelHeading>
                             <p className="muted">Save this task to add checklist items.</p></section>}
                         {id !== 'new' && <TaskChecklist
                             key={JSON.stringify([id, people.map((person) => [person.id, person.userId, person.accountIsActive])])}
                             taskId={id} onEditingChange={setChecklistEditing} onHistoryChange={refreshHistory} />}
-                        {id === 'new' && <section className="panel task-dependencies"><h2>Dependencies</h2>
-                            <p className="muted">Save this task to add dependencies.</p></section>}
-                        {!loading && details && <TaskDependencies key={`dependencies-${id}`} task={details.task}
-                            disabled={saving || labelEditing.dirty || labelEditing.saving || workflowEditing.dirty || workflowEditing.saving}
-                            onEditingChange={setDependencyEditing} onFailure={setError} onReloadTask={reloadTask}
+                        {id === 'new' && <section className="panel task-linked-tickets"><TaskPanelHeading icon={Link} title="Linked tickets">Link related tickets or parent/child tasks.</TaskPanelHeading>
+                            <p className="muted">Choose an optional parent in Task details. Save this task to add child tickets.</p></section>}
+                        {!loading && details && <TaskLinkedTickets key={`linked-tickets-${id}`} task={details.task}
+                            disabled={saving || dirty || labelEditing.dirty || labelEditing.saving}
+                            onEditingChange={setLinkedTicketEditing} onFailure={setError} onReloadTask={reloadTask}
                             onSaved={(change, expectedVersion) => {
-                                setDetails((current) => current ? { ...current, task: mergeDependencyVersion(current.task, change, expectedVersion) } : current);
-                                setValues((current) => mergeDependencyVersion(current, change, expectedVersion));
+                                setDetails((current) => current ? { ...current, task: mergeLinkedTicketVersion(current.task, change, expectedVersion) } : current);
+                                setValues((current) => mergeLinkedTicketVersion(current, change, expectedVersion));
                                 refreshHistory();
-                                onSaved('Task dependency updated.');
+                                onSaved('Linked tickets updated.');
                             }} />}
                     </aside>
                 </div>
@@ -608,7 +744,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange }) {
                         <h2 id="discard-task-title">{pendingSave ? 'Saving changes…' : 'Discard your unsaved changes?'}</h2>
                         <p id="discard-task-description">
                             {pendingSave ? 'Wait for the save to finish before leaving this task.' :
-                                'Your task edits, status change, label and dependency selections, checklist draft, unposted comment draft and queued files will be lost if you leave this page.'}
+                                'Your task edits, status change, label and linked-ticket selections, checklist draft, unposted comment draft and queued files will be lost if you leave this page.'}
                         </p>
                     </div>
                     <div className="drawer-footer">
