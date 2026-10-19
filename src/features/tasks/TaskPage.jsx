@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import TaskFollowButton from './TaskFollowButton.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBlocker, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Clock3, RotateCcw, Link, FileText, Settings2, CheckSquare } from 'lucide-react';
@@ -9,7 +10,8 @@ import { taskInput } from './taskActions';
 import { taskStatusName } from './taskWorkflow';
 import { allowedDisciplineStatuses, loadStatusSettings } from './liveStatuses.js';
 import './task-detail-design.css';
-import { shouldBlockTaskNavigation, taskPathAfterSave, withoutParentSelection } from './taskNavigation';
+import { shouldBlockTaskNavigation, taskScopeLocation, withoutParentSelection } from './taskNavigation';
+import { projectClientContext, projectClientIds, taskClientId } from '../projects/projectClients';
 import TaskDiscussion from './TaskDiscussion';
 import TaskPageTabs from './TaskPageTabs';
 import TaskPanelHeading from './TaskPanelHeading';
@@ -28,6 +30,7 @@ const emptyTask = {
     description: '',
     discipline: disciplines[0],
     projectId: '',
+    clientId: '',
     parentTaskId: '',
     priority: 'Medium',
     dueDate: '',
@@ -40,9 +43,9 @@ const emptyTask = {
     version: 0,
 };
 
-export default function TaskPage({ id, onClose, onSaved, onEditingChange, projectScope = null }) {
+export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTaskLoaded, projectScope = null }) {
     const dispatch = useDispatch();
-    const { people, projects, tasks = [] } = useSelector((state) => state.workspace);
+    const { people, projects, clients = [], tasks = [] } = useSelector((state) => state.workspace);
     const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
     const statusSettingsError = useSelector((state) => state.workspace.statusSettings?.error);
     const administrator = useSelector((state) => state.auth.user.role === 'Administrator');
@@ -50,11 +53,19 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
     const confirmRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
-    const [values, setValues] = useState(() => ({
-        ...emptyTask,
-        projectId: projectScope && projectScope !== 'general' ? projectScope : '',
-        parentTaskId: id === 'new' ? new URLSearchParams(location.search).get('parentTaskId') || '' : '',
-    }));
+    const [values, setValues] = useState(() => {
+        const parentTaskId = id === 'new' ? new URLSearchParams(location.search).get('parentTaskId') || '' : '';
+        const parent = tasks.find((task) => task.id === parentTaskId);
+        const projectId = parent && projects.some((project) => project.id === parent.projectId)
+            ? parent.projectId : projectScope && projectScope !== 'general' ? projectScope : '';
+        return {
+            ...emptyTask,
+            projectId,
+            clientId: parent ? taskClientId(parent, projects, clients) || ''
+                : projectClientContext(projects.find((project) => project.id === projectId), clients, location.search) || '',
+            parentTaskId,
+        };
+    });
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(id !== 'new');
     const [saving, setSaving] = useState(false);
@@ -75,6 +86,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
     const [customDraftVersions, setCustomDraftVersions] = useState({});
     const [customReloading, setCustomReloading] = useState(false);
     const customProjectId = projects.some((project) => project.id === values.projectId) ? values.projectId : null;
+    const parentCandidates = tasks.filter((task) => (task.projectId || '') === values.projectId &&
+        taskClientId(task, projects, clients) === taskClientId(values, projects, clients));
     const customResource = useSelector((state) => state.workspace.customFields?.[customProjectId] || emptyCustomFields);
     const columnRevision = useSelector((state) => state.workspace.taskColumnsRevision || 0);
     const columnEpoch = useSelector((state) => state.workspace.taskColumnsEpoch || 0);
@@ -82,15 +95,16 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
         taskColumnKey({ projectId: customProjectId, discipline: values.discipline })] || emptyTaskColumns);
     const columnsReady = Boolean(columnResource.data && !columnResource.error && !columnResource.invalidated && columnResource.data.version === columnRevision);
     const visibleColumns = columnsReady ? columnResource.data.columns : [];
+    const createOriginalFromOwner = id === 'new' && columnsReady && !visibleColumns.includes('originalAssignee');
     const visibleCustomFields = visibleColumns.map((column) => customResource.data?.fields.find(
         (field) => !field.isArchived && column === `custom:${field.id.toLowerCase()}`)).filter(Boolean);
     const customValues = projectFieldDraft(customDrafts, values.projectId, details?.task);
     const customReady = Boolean(customResource.data && !customResource.error && !customResource.invalidated && customResource.data.version === columnRevision);
     const customStale = Object.hasOwn(customDraftVersions, values.projectId) && customDraftVersions[values.projectId] !== columnRevision;
-    const customSaveBlocked = Boolean(administrator && customProjectId && (!customReady || customStale));
+    const editable = id === 'new' ? administrator : details?.canEditDetails;
+    const customSaveBlocked = Boolean(editable && customProjectId && (!customReady || customStale));
     const unsaved = dirty || discussionEditing.dirty || attachmentEditing.dirty || checklistEditing.dirty || labelEditing.dirty || linkedTicketEditing.dirty;
     const pendingSave = saving || customReloading || discussionEditing.saving || attachmentEditing.saving || checklistEditing.saving || labelEditing.saving || linkedTicketEditing.saving;
-    const editable = id === 'new' ? administrator : details?.canEditDetails;
     const allowedStatuses = id === 'new' ? ['To Do'] : details?.allowedStatuses || [];
     const statusChoices = allowedDisciplineStatuses(statusSettings, values.discipline).filter((status) =>
         status.code === values.status || administrator || allowedStatuses.includes(status.code));
@@ -98,7 +112,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
     const disciplineStatusInvalid = disciplineChanged && !statusChoices.some((status) => status.code === values.status);
     const statusDisplayName = statusSettings?.catalog.find((status) => status.code === values.status)?.name || values.status;
     const saveDisabled = pendingSave || customSaveBlocked || disciplineStatusInvalid || linkedTicketEditing.dirty || loading ||
-        (!details && id !== 'new') || (id === 'new' && !newWorkflowReady) || (id !== 'new' && !dirty && !labelEditing.dirty);
+        (!details && id !== 'new') || (id === 'new' && (!newWorkflowReady || !columnsReady)) || (id !== 'new' && !dirty && !labelEditing.dirty);
     let saveMessage = id === 'new' ? 'Not saved yet' : 'All changes saved';
     if (dirty || labelEditing.dirty) {
         saveMessage = 'Unsaved changes';
@@ -187,7 +201,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
 
     useEffect(() => {
         if (savedPath && !dirty && !saving && blocker.state === 'unblocked') {
-            navigate({ pathname: savedPath, search: withoutParentSelection(location.search) }, { replace: true });
+            navigate(savedPath,
+                { replace: true, state: location.state });
         }
     }, [savedPath, dirty, saving, blocker.state, navigate, location.search]);
 
@@ -201,8 +216,10 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
         setError(null);
         request(`/tasks/${id}`, { signal: controller.signal })
             .then((result) => {
-                if (projectScope && (projectScope === 'general' ? Boolean(result.task.projectId) : result.task.projectId !== projectScope)) {
-                    throw new Error('This task is not in the selected project. Open it from its project or notification.');
+                onTaskLoaded?.(result.task);
+                const actual = taskScopeLocation(result.task, projects, clients, location.search);
+                if (location.pathname && (actual.pathname !== location.pathname || actual.search !== location.search)) {
+                    navigate(actual, { replace: true, state: location.state });
                 }
                 setDetails(result);
                 const loaded = {
@@ -211,6 +228,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
                     note: '',
                     dueDate: result.task.dueDate?.slice(0, 10) || '',
                     projectId: result.task.projectId || '',
+                    clientId: result.task.clientId || '',
                     assigneeId: result.task.assigneeId || '',
                     reviewerId: result.task.reviewerId || '',
                     releaseOwnerId: result.task.releaseOwnerId || '',
@@ -252,7 +270,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
     }, [id, statusSettings?.version]);
 
     function change(name, value) {
-        if (name === 'discipline' && !administrator) {
+        if (['discipline', 'projectId', 'clientId'].includes(name) && !administrator) {
             return;
         }
         if (name === 'projectId' && Object.hasOwn(customDrafts, values.projectId) &&
@@ -265,6 +283,9 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
         }
         setValues((current) => {
             const next = { ...current, [name]: value };
+            if (name === 'projectId' && !projectClientIds(projects.find((project) => project.id === value), clients).includes(current.clientId)) {
+                next.clientId = '';
+            }
             if (name === 'originalAssigneeId' && !current.assigneeId) {
                 next.assigneeId = value;
             }
@@ -273,7 +294,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
     }
 
     function changeCustomField(fieldId, value) {
-        if (!customReady || !columnsReady || customStale || !administrator || !editable) {
+        if (!customReady || !columnsReady || customStale || !editable) {
             return;
         }
         setDirty(true);
@@ -361,7 +382,11 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
 
     async function submit(event) {
         event.preventDefault();
-        if (pendingSave || customSaveBlocked || disciplineStatusInvalid || linkedTicketEditing.dirty || linkedTicketEditing.saving || (id === 'new' && !newWorkflowReady)) {
+        if (loading || pendingSave || customSaveBlocked || disciplineStatusInvalid || linkedTicketEditing.dirty || linkedTicketEditing.saving || (id === 'new' && (!newWorkflowReady || !columnsReady))) {
+            return;
+        }
+        if (createOriginalFromOwner && !values.assigneeId) {
+            setError({ message: 'Select Assigned To before creating this task.' });
             return;
         }
         setError(null);
@@ -372,23 +397,42 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
         }
         if (id === 'new') {
             payload.parentTaskId = values.parentTaskId || null;
+            payload.clientId = values.clientId || null;
+            if (createOriginalFromOwner) {
+                payload.originalAssigneeId = values.assigneeId;
+            }
+            if (!visibleColumns.includes('qa')) {
+                payload.reviewerId = null;
+            }
+        }
+        else if (administrator && (values.clientId || null) !== (details.task.clientId || null)) {
+            payload.clientId = values.clientId || null;
         }
         for (const field of ['projectId', 'assigneeId', 'reviewerId', 'releaseOwnerId', 'dueDate']) {
             payload[field] = payload[field] || null;
         }
         try {
             Object.assign(payload, customTaskPayload({ projectId: customProjectId, page: customResource.data,
-                revision: columnRevision, values: customDrafts[values.projectId] || {}, administrator: administrator && Boolean(editable),
+                revision: columnRevision, values: customDrafts[values.projectId] || {}, canEdit: Boolean(editable),
                 error: customResource.error, invalidated: customResource.invalidated }));
             const saved = await dispatch(saveTask({ id: id === 'new' ? null : id, values: payload })).unwrap();
+            onTaskLoaded?.({ ...values, ...saved, projectId: payload.projectId });
+            if (saved.version !== undefined) {
+                setValues((current) => ({ ...current, version: saved.version }));
+            }
+            else if (id !== 'new') {
+                setLoading(true);
+            }
             setDirty(false);
             setCustomDrafts({});
             setCustomDraftVersions({});
             setSaving(false);
-            if (id === 'new' || (projectScope && (payload.projectId || 'general') !== projectScope)) {
-                setSavedPath(taskPathAfterSave(saved, payload.projectId, projectScope));
+            if (id === 'new' || (payload.projectId || '') !== (details.task.projectId || '') ||
+                Object.hasOwn(payload, 'clientId')) {
+                setSavedPath(taskScopeLocation({ ...values, ...saved, projectId: payload.projectId,
+                    clientId: Object.hasOwn(payload, 'clientId') ? payload.clientId : values.clientId }, projects, clients, location.search));
             }
-            else {
+            if (id !== 'new') {
                 setReload((value) => value + 1);
             }
             onSaved(id === 'new' ? 'Task created.' : 'Task updated.');
@@ -406,11 +450,11 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
                 <select form="task-details-form"
                     value={values[name]}
                     disabled={disabled || saving}
-                    required={name === 'originalAssigneeId'}
+                    required={name === 'originalAssigneeId' || (name === 'assigneeId' && createOriginalFromOwner)}
                     onChange={(event) => change(name, event.target.value)}
                 >
                     <option value="">
-                        {name === 'originalAssigneeId' ? 'Select staff' : 'Unassigned'}
+                        {name === 'originalAssigneeId' || (name === 'assigneeId' && createOriginalFromOwner) ? 'Select staff' : 'Unassigned'}
                     </option>
                     {people
                         .filter((person) => person.isActive || person.id === values[name])
@@ -455,6 +499,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
                     {linkMessage && <p role="status">{linkMessage}</p>}
                 </div>
                 <div className="task-header-actions">
+                    {id !== 'new' && details && <TaskFollowButton taskId={id} />}
                     <span className="muted task-save-state" role="status">{saveMessage}</span>
                     <button type="submit" form="task-details-form" className="button primary" disabled={saveDisabled}
                         onClick={() => setActiveTab('details')}>
@@ -560,7 +605,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
                                                             <span>Project</span>
                                                             <select form="task-details-form"
                                                                 value={values.projectId}
-                                                                disabled={id === 'new' && Boolean(projectScope)}
+                                                                disabled={!administrator || (id === 'new' && Boolean(projectScope))}
                                                                 onChange={(event) => change('projectId', event.target.value)}
                                                             >
                                                                 <option value="">General · no project</option>
@@ -591,8 +636,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
                                                                 onChange={(event) => change('dueDate', event.target.value)}
                                                             />
                                                         </label>
-                                                        {(id === 'new' || visibleColumns.includes('originalAssignee')) && personSelect('originalAssigneeId', 'Original assignee')}
-                                                        {(id === 'new' || visibleColumns.includes('qa')) && values.workflow?.definition.mode !== 'Simple' && personSelect('reviewerId', 'Reviewer / QA')}
+                                                        {visibleColumns.includes('originalAssignee') && personSelect('originalAssigneeId', 'Original assignee')}
+                                                        {visibleColumns.includes('qa') && values.workflow?.definition.mode !== 'Simple' && personSelect('reviewerId', 'Reviewer / QA')}
                                                         <label className="field full">
                                                             <span>Description</span>
                                                             <textarea form="task-details-form"
@@ -613,8 +658,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
                                                                 {values.parentTaskId && !tasks.some((task) => task.id === values.parentTaskId) &&
                                                                     <option value={values.parentTaskId}>Selected parent unavailable — choose another or clear it</option>}
                                                                 {[
-                                                                    { label: 'This project', items: tasks.filter((task) => (task.projectId || '') === values.projectId) },
-                                                                    { label: 'Other projects and general tasks', items: tasks.filter((task) => (task.projectId || '') !== values.projectId) },
+                                                                    { label: 'This client and project', items: parentCandidates },
+                                                                    { label: 'Other clients, projects and general tasks', items: tasks.filter((task) => !parentCandidates.includes(task)) },
                                                                 ].filter((group) => group.items.length).map((group) => <optgroup key={group.label} label={group.label}>
                                                                     {group.items.map((task) => <option key={task.id} value={task.id}>{task.code} · {task.title}</option>)}
                                                                 </optgroup>)}
@@ -654,12 +699,12 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, projec
                                 : !columnsReady ? <p className={columnResource.error ? 'error' : 'hint'} role="status">
                                     {columnResource.error?.message || 'Loading current task field visibility…'} Reload project fields to try again.</p>
                                 : <><TaskCustomFields fields={visibleCustomFields} values={customValues} people={people}
-                                    editable={administrator && Boolean(editable)} disabled={pendingSave || customStale}
+                                    editable={Boolean(editable)} disabled={pendingSave || customStale}
                                     onChange={changeCustomField} />
                                     {customStale && <p className="error" role="alert">Project fields changed. Your draft is preserved. Reload project fields before saving.</p>}</>}
                             {Object.keys(customDrafts).some((projectId) => projectId !== values.projectId) &&
                                 <p className="hint">Field edits for other projects are kept while this form is open. Saving applies only to the selected project.</p>}
-                            {administrator && <p className="hint task-project-save-hint">Only custom fields you edit are saved. Untouched values are preserved.</p>}
+                            {editable && <p className="hint task-project-save-hint">Only custom fields you edit are saved. Untouched values are preserved.</p>}
                             {details?.task.projectId && details.task.projectId !== values.projectId &&
                                 <p className="hint">Existing values for the selected project are not loaded here. Save the project change and reload the task to view them.</p>}
                         </section>}

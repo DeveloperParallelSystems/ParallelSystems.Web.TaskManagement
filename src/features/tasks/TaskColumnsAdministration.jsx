@@ -7,6 +7,7 @@ import ProjectCustomFieldsAdministration from './ProjectCustomFieldsAdministrati
 import { columnError, columnLabels, defaultTaskColumns, loadTaskColumns, requiredTaskColumns, saveTaskColumns, useDefaultTaskColumns, useTaskColumnProfiles } from './taskColumns';
 import './board-presentation-design.css';
 import './task-columns.css';
+import { projectsForClient } from '../projects/projectClients';
 
 export default function TaskColumnsAdministration({ onEditingChange }) {
     const { clients = [], projects = [] } = useSelector((state) => state.workspace);
@@ -19,9 +20,8 @@ export default function TaskColumnsAdministration({ onEditingChange }) {
         setEditing(value);
         onEditingChange(value);
     }, [onEditingChange]);
-    const clientIds = new Set(clients.map((client) => client.id));
-    const unassigned = projects.filter((project) => !clientIds.has(project.clientId));
-    const available = clientId === 'unassigned' ? unassigned : projects.filter((project) => project.clientId === clientId);
+    const unassigned = projectsForClient(projects, clients, 'unassigned');
+    const available = projectsForClient(projects, clients, clientId);
     const project = available.find((item) => item.id === projectId);
 
     function switchScope(update) {

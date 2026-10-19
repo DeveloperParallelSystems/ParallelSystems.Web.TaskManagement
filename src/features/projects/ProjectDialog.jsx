@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { FolderPlus, X } from 'lucide-react';
 import { createProject } from '../../app/store';
+import ProjectClientsPicker from './ProjectClientsPicker';
 
 export default function ProjectDialog({ onClose, onCreated, initialClientId = '' }) {
     const dispatch = useDispatch();
     const clients = useSelector((state) => state.workspace.clients || []);
-    const [clientId, setClientId] = useState(initialClientId);
+    const [clientIds, setClientIds] = useState(initialClientId ? [initialClientId] : []);
     const dialogRef = useRef(null);
     const [name, setName] = useState('');
     const [saving, setSaving] = useState(false);
@@ -35,7 +36,7 @@ export default function ProjectDialog({ onClose, onCreated, initialClientId = ''
         setError(null);
         setSaving(true);
         try {
-            const project = await dispatch(createProject({ name: trimmedName, clientId: clientId || null })).unwrap();
+            const project = await dispatch(createProject({ name: trimmedName, clientIds })).unwrap();
             onCreated(project);
         }
         catch (failure) {
@@ -84,14 +85,7 @@ export default function ProjectDialog({ onClose, onCreated, initialClientId = ''
                             placeholder="Enter a project name"
                         />
                     </label>
-                    <label className="field">
-                        <span>Client (optional)</span>
-                        <select value={clientId} disabled={saving} onChange={(event) => setClientId(event.target.value)}>
-                            <option value="">No client · unassigned</option>
-                            {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-                        </select>
-                    </label>
-                    <p className="project-dialog-help">Projects without a client are available under Unassigned projects.</p>
+                    <ProjectClientsPicker clients={clients} clientIds={clientIds} onChange={setClientIds} disabled={saving} />
                 </div>
                 <div className="drawer-footer">
                     <button type="button" className="button" disabled={saving} onClick={close}>Cancel</button>

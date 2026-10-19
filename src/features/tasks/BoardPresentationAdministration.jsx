@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSelector } from 'react-redux';
 import WorkflowPresentationPage from './WorkflowPresentationPage';
+import { projectsForClient } from '../projects/projectClients';
 
 export default function BoardPresentationAdministration({ onEditingChange }) {
     const { clients = [], projects = [] } = useSelector((state) => state.workspace);
@@ -12,9 +13,8 @@ export default function BoardPresentationAdministration({ onEditingChange }) {
         setEditing(value);
         onEditingChange(value);
     }, [onEditingChange]);
-    const clientIds = new Set(clients.map((client) => client.id));
-    const unassigned = projects.filter((project) => !clientIds.has(project.clientId));
-    const availableProjects = clientId === 'unassigned' ? unassigned : projects.filter((project) => project.clientId === clientId);
+    const unassigned = projectsForClient(projects, clients, 'unassigned');
+    const availableProjects = projectsForClient(projects, clients, clientId);
     const selectedProject = availableProjects.find((project) => project.id === projectId);
     const selectedClient = clients.find((client) => client.id === clientId);
 

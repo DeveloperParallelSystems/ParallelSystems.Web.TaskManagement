@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { request } from '../../app/api';
+import ProjectClientsPicker from './ProjectClientsPicker';
+import { projectClientIds } from './projectClients';
 
 export default function ProjectClientDialog({ project, onClose, onSaved }) {
     const clients = useSelector((state) => state.workspace.clients || []);
     const dialog = useRef(null);
-    const [clientId, setClientId] = useState(project.clientId || '');
+    const [initialClientIds] = useState(() => projectClientIds(project, clients));
+    const [clientIds, setClientIds] = useState(initialClientIds);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     useEffect(() => {
@@ -13,7 +16,8 @@ export default function ProjectClientDialog({ project, onClose, onSaved }) {
     }, []);
 
     function close() {
-        if (!saving && (clientId === (project.clientId || '') || window.confirm('Discard client assignment changes?'))) {
+        const unchanged = clientIds.length === initialClientIds.length && clientIds.every((id) => initialClientIds.includes(id));
+        if (!saving && (unchanged || window.confirm('Discard client assignment changes?'))) {
             onClose();
         }
     }
@@ -23,11 +27,11 @@ export default function ProjectClientDialog({ project, onClose, onSaved }) {
         setSaving(true);
         setError('');
         try {
-            await request(`/projects/${project.id}/client`, { method: 'PUT', body: { clientId: clientId || null } });
+            await request(`/projects/${project.id}/clients`, { method: 'PUT', body: { clientIds } });
             onSaved();
         }
         catch (failure) {
-            setError(failure.message || 'Unable to change client.');
+            setError(failure.message || 'Unable to change clients.');
             setSaving(false);
         }
     }
@@ -38,20 +42,15 @@ export default function ProjectClientDialog({ project, onClose, onSaved }) {
             close();
         }}>
             <form onSubmit={submit}>
-                <div className="drawer-head"><h2 id="project-client-title">Change client</h2></div>
+                <div className="drawer-head"><h2 id="project-client-title">Manage clients</h2></div>
                 <div className="drawer-body">
                     <p>{project.name}</p>
                     {error && <div className="error" role="alert">{error}</div>}
-                    <label className="field"><span>Client (optional)</span>
-                        <select autoFocus value={clientId} disabled={saving} onChange={(event) => setClientId(event.target.value)}>
-                            <option value="">No client · unassigned</option>
-                            {clients.map((client) => <option value={client.id} key={client.id}>{client.name}</option>)}
-                        </select>
-                    </label>
+                    <ProjectClientsPicker clients={clients} clientIds={clientIds} onChange={setClientIds} disabled={saving} />
                 </div>
                 <div className="drawer-footer">
                     <button type="button" className="button" onClick={close} disabled={saving}>Cancel</button>
-                    <button className="button primary" disabled={saving}>{saving ? 'Saving…' : 'Save client'}</button>
+                    <button className="button primary" disabled={saving}>{saving ? 'Saving…' : 'Save clients'}</button>
                 </div>
             </form>
         </dialog>

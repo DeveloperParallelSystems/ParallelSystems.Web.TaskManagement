@@ -1,13 +1,16 @@
+import { notificationBadge } from './features/tasks/notificationInbox.js';
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CalendarDays, CheckSquare2, Columns3, GitBranch, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Tags, X } from 'lucide-react';
+import { Bell, CalendarDays, CheckSquare2, GitBranch, Kanban, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Table, Tags, X } from 'lucide-react';
 import { checkSession, loadWorkspace, logout } from './app/store';
 import LoginPage from './features/auth/LoginPage';
 import TaskPage from './features/tasks/TaskPage';
-import { taskIdFromPath, projectScopeFromPath, withoutParentSelection } from './features/tasks/taskNavigation';
+import { taskIdFromPath, projectScopeFromPath, taskScopeLocation, withoutParentSelection } from './features/tasks/taskNavigation';
 import ClientsPage from './features/projects/ClientsPage';
+import { followingSearch } from './features/tasks/FollowingFilter';
 import ClientProjectsPage from './features/projects/ClientProjectsPage';
+import { clientScopeSearch, projectClientContext, taskClientId } from './features/projects/projectClients';
 import NotificationsPage from './features/tasks/NotificationsPage';
 import TasksPage from './features/tasks/TasksPage';
 import LabelsPage from './features/tasks/LabelsPage';
@@ -58,7 +61,7 @@ const pages = {
     },
     '/notifications': {
         title: 'Notifications',
-        description: 'Assignments and review handoffs that need your attention.',
+        description: 'Task updates, mentions and changes to work you follow.',
     },
 };
 
@@ -70,17 +73,29 @@ export default function App() {
     const [toast, setToast] = useState('');
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [workspaceSearch, setWorkspaceSearch] = useState('');
+    const [openedTask, setOpenedTask] = useState(null);
     const workspaceSearchRef = useRef(null);
     const location = useLocation();
     const navigate = useNavigate();
     const selected = taskIdFromPath(location.pathname);
-    const projectScope = projectScopeFromPath(location.pathname);
+    const routeProjectScope = projectScopeFromPath(location.pathname);
+    const selectedTask = selected && selected !== 'new' ? (openedTask?.id === selected ? openedTask
+        : workspace.tasks.find((task) => task.id === selected)) : null;
+    const projectScope = selectedTask
+        ? (workspace.projects.some((project) => project.id === selectedTask.projectId) ? selectedTask.projectId : (!selectedTask.projectId ? 'general' : null))
+        : routeProjectScope;
     const taskManagementActive = /^\/(clients|projects|tasks)(\/|$)/i.test(location.pathname);
+    const followSearch = projectScope ? followingSearch(location.search) : '';
     const scopedProject = workspace.projects.find((project) => project.id === projectScope);
     const clientScope = location.pathname.match(/^\/clients\/([^/]+)\/projects\/?$/)?.[1];
-    const scopedClient = (workspace.clients || []).find((client) => client.id === (clientScope || scopedProject?.clientId));
+    const contextualClientId = selectedTask ? taskClientId(selectedTask, workspace.projects, workspace.clients || [])
+        : projectClientContext(scopedProject, workspace.clients || [], location.search);
+    const scopedClient = (workspace.clients || []).find((client) => client.id === (clientScope || contextualClientId));
+    const clientSearch = projectScope ? `client=${encodeURIComponent(contextualClientId === undefined
+        ? new URLSearchParams(location.search).get('client') : contextualClientId || 'unassigned')}` : '';
     const taskBase = projectScope ? `/projects/${projectScope}/tasks` : '/tasks';
-    const canCreateTask = !projectScope || projectScope === 'general' || Boolean(scopedProject);
+    const clientUnavailable = Boolean(projectScope && contextualClientId === undefined);
+    const canCreateTask = !clientUnavailable && (!projectScope || projectScope === 'general' || Boolean(scopedProject));
     const { title, description } = projectScope
         ? { title: scopedProject?.name || (projectScope === 'general' ? 'General tasks' : 'Project unavailable'), description: 'Task Management · Plan and manage work in this project.' }
         : clientScope ? { title: scopedClient?.name || (clientScope === 'unassigned' ? 'Unassigned projects' : 'Client unavailable'), description: 'Choose a project to open its task management workspace.' }
@@ -92,13 +107,18 @@ export default function App() {
 
     function setSelected(id, status = null) {
         if (id) {
+            const task = workspace.tasks.find((item) => item.id === id);
+            const target = task ? taskScopeLocation(task, workspace.projects, workspace.clients || [], location.search)
+                : { pathname: `${taskBase}/${id}`, search: withoutParentSelection(projectScope
+                    ? clientScopeSearch(location.search, contextualClientId) : location.search) };
             navigate(
-                { pathname: `${taskBase}/${id}`, search: withoutParentSelection(location.search) },
+                target,
                 { state: { initialStatus: status } },
             );
         }
         else {
-            navigate({ pathname: taskBase, search: withoutParentSelection(location.search) });
+            navigate({ pathname: taskBase, search: withoutParentSelection(projectScope
+                ? clientScopeSearch(location.search, contextualClientId) : location.search) });
         }
     }
 
@@ -108,6 +128,7 @@ export default function App() {
 
     useEffect(() => {
         setTaskEditing({ dirty: false, saving: false });
+        setOpenedTask(null);
         if (auth.status !== 'authenticated') {
             return;
         }
@@ -198,7 +219,7 @@ export default function App() {
     const calendarActive = location.pathname === taskBase && new URLSearchParams(location.search).get('view') === 'calendar';
     const taskDetails = selected ? (
         <TaskPage key={`${projectScope || ''}:${selected}`} id={selected} projectScope={projectScope}
-            onClose={() => setSelected(null)} onEditingChange={setTaskEditing} onSaved={(message) => {
+            onTaskLoaded={setOpenedTask} onClose={() => setSelected(null)} onEditingChange={setTaskEditing} onSaved={(message) => {
                 setToast(message);
                 dispatch(loadWorkspace());
             }} />
@@ -235,7 +256,7 @@ export default function App() {
                             <Bell size={19} />
                             Notifications
                             {workspace.notifications.unreadCount > 0 && (
-                                <span className="notification-count">{workspace.notifications.unreadCount}</span>
+                                <span className="notification-count">{notificationBadge(workspace.notifications.unreadCount)}</span>
                             )}
                         </NavLink>
                     </nav>
@@ -243,8 +264,8 @@ export default function App() {
                         <div className="nav-label nav-section-label">ADMINISTRATION</div>
                         <nav aria-label="Administration">
                             <NavLink to="/labels"><Tags size={18} />Labels</NavLink>
-                            <NavLink to="/task-columns"><Columns3 size={18} />Task columns</NavLink>
-                            <NavLink to="/board-presentation"><Columns3 size={18} />Board presentation</NavLink>
+                            <NavLink to="/task-columns"><Table size={18} />Task columns</NavLink>
+                            <NavLink to="/board-presentation"><Kanban size={18} />Board presentation</NavLink>
                             <NavLink to="/status-catalog"><Tags size={18} />Status catalog</NavLink>
                             <NavLink to="/discipline-statuses"><GitBranch size={18} />Discipline statuses</NavLink>
                         </nav>
@@ -262,10 +283,10 @@ export default function App() {
                         {clientScope || projectScope ? <>
                             <Link to="/clients">Task Management</Link><span>/</span>
                             {projectScope !== 'general' && <><Link to={`/clients/${scopedClient?.id || 'unassigned'}/projects`}>
-                                {scopedClient?.name || 'Unassigned projects'}</Link>{projectScope && <span>/</span>}</>}
+                                {scopedClient?.name || (clientUnavailable ? 'Client unavailable' : 'Unassigned projects')}</Link>{projectScope && <span>/</span>}</>}
                             {projectScope && <>
                                 {selected ? <>
-                                    <Link to={taskBase}>{scopedProject?.name || (projectScope === 'general' ? 'General tasks' : 'Project unavailable')}</Link>
+                                    <Link to={{ pathname: taskBase, search: withoutParentSelection(clientScopeSearch(location.search, contextualClientId)) }}>{scopedProject?.name || (projectScope === 'general' ? 'General tasks' : 'Project unavailable')}</Link>
                                     <span>/</span><strong>{breadcrumbTitle}</strong>
                                 </> : <strong>{scopedProject?.name || (projectScope === 'general' ? 'General tasks' : 'Project unavailable')}</strong>}
                             </>}
@@ -273,7 +294,7 @@ export default function App() {
                     </div>
                     <form className="workspace-search" role="search" aria-label="Workspace task search" onSubmit={(event) => {
                         event.preventDefault();
-                        navigate({ pathname: taskBase, search: serializeTaskQuery({ ...defaultTaskQuery, search: workspaceSearch.trim() }) });
+                        navigate({ pathname: taskBase, search: serializeTaskQuery({ ...defaultTaskQuery, search: workspaceSearch.trim(), followingOnly: Boolean(followSearch) }, clientSearch) });
                     }}>
                         <Search size={16} aria-hidden="true" />
                         <input ref={workspaceSearchRef} type="search" aria-label="Search workspace tasks" placeholder="Search tasks, projects or people"
@@ -378,14 +399,15 @@ export default function App() {
                             <Route path="/tasks" element={<TasksPage onOpen={setSelected} />} />
                             <Route path="/tasks/:taskId" element={taskDetails} />
                             <Route path="/clients" element={<ClientsPage />} />
+                            <Route path="/following" element={<Navigate to="/clients" replace />} />
                             <Route path="/clients/:clientId/projects" element={<ClientProjectsPage key={clientScope} />} />
-                            <Route path="/projects/:projectId/tasks" element={projectUnavailable
-                                ? <div className="empty panel">Project unavailable. <Link to="/clients">Back to clients</Link></div>
+                            <Route path="/projects/:projectId/tasks" element={projectUnavailable || clientUnavailable
+                                ? <div className="empty panel">{projectUnavailable ? 'Project unavailable.' : 'Client unavailable for this project.'} <Link to="/clients">Back to clients</Link></div>
                                 : <TasksPage key={projectScope} projectScope={projectScope} onOpen={setSelected} />} />
-                            <Route path="/projects/:projectId/tasks/:taskId" element={projectUnavailable
+                            <Route path="/projects/:projectId/tasks/:taskId" element={selected === 'new' && (projectUnavailable || clientUnavailable)
                                 ? <div className="empty panel">Project unavailable. <Link to="/clients">Back to clients</Link></div> : taskDetails} />
                             <Route path="/dashboard" element={<Dashboard onOpen={setSelected} />} />
-                            <Route path="/projects" element={<ClientProjectsPage />} />
+                            <Route path="/projects" element={<Navigate to="/clients" replace />} />
                             <Route path="/notifications" element={<NotificationsPage />} />
                             <Route path="*" element={<Navigate to="/clients" replace />} />
                         </Routes>
@@ -402,9 +424,9 @@ export default function App() {
                     aria-current={taskManagementActive && !calendarActive ? 'page' : undefined}>
                     <CheckSquare2 size={20} /><span>Task Management</span>
                 </Link>
-                <Link to={`${taskBase}?view=calendar`} aria-current={calendarActive ? 'page' : undefined}
+                <Link to={`${taskBase}?view=calendar${clientSearch ? `&${clientSearch}` : ''}${followSearch ? '&following=1' : ''}`} aria-current={calendarActive ? 'page' : undefined}
                     className={calendarActive ? 'active' : ''}><CalendarDays size={20} /><span>Calendar</span></Link>
-                <NavLink to="/notifications"><Bell size={20} /><span>Notifications{workspace.notifications.unreadCount > 0 ? ` (${workspace.notifications.unreadCount})` : ''}</span></NavLink>
+                <NavLink to="/notifications"><Bell size={20} /><span>Notifications{workspace.notifications.unreadCount > 0 ? ` (${notificationBadge(workspace.notifications.unreadCount)})` : ''}</span></NavLink>
             </nav>
             {toast && (
                 <div className="toast" role="status">

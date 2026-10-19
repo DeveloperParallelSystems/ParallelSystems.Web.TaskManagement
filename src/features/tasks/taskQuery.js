@@ -13,13 +13,13 @@ export const quickViews = [
 ];
 export const sortOptions = [['dueDate', 'Due date'], ['priority', 'Priority'], ['updatedAtUtc', 'Last updated'], ['title', 'Title']];
 export const defaultTaskQuery = {
-    search: '', discipline: '', status: '', projectId: '', mine: false, labelIds: [],
+    search: '', discipline: '', status: '', projectId: '', mine: false, followingOnly: false, labelIds: [],
     quickView: '', sort: 'updatedAtUtc', direction: 'desc', view: 'board', assigneeId: '', month: '',
 };
 const keys = {
     search: 'q', discipline: 'discipline', status: 'status', projectId: 'project',
     mine: 'mine', quickView: 'quick', sort: 'sort', direction: 'dir', view: 'view',
-    assigneeId: 'assignee', month: 'month',
+    assigneeId: 'assignee', month: 'month', followingOnly: 'following',
 };
 
 export function parseTaskQuery(query) {
@@ -31,6 +31,7 @@ export function parseTaskQuery(query) {
         }
     }
     state.mine = params.get('mine') === '1';
+    state.followingOnly = params.get('following') === '1';
     state.assigneeId = state.assigneeId.toLowerCase();
     if (state.assigneeId !== 'unassigned' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(state.assigneeId)) {
         state.assigneeId = '';
@@ -72,7 +73,7 @@ export function serializeTaskQuery(state, existing = '') {
         params.delete(key);
         const value = state[name];
         if (value !== undefined && value !== defaultTaskQuery[name] && value !== '') {
-            params.set(key, name === 'mine' ? (value ? '1' : '0') : value);
+            params.set(key, name === 'mine' || name === 'followingOnly' ? (value ? '1' : '0') : value);
         }
     }
     return params.toString();

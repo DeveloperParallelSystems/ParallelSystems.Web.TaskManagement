@@ -2,11 +2,12 @@ import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Building2, FolderOpen } from 'lucide-react';
 import './client-navigation.css';
+import { projectsForClient } from './projectClients';
 
 export default function ClientsPage() {
     const { clients = [], projects, tasks } = useSelector((state) => state.workspace);
-    const unassigned = projects.filter((project) => !project.clientId || !clients.some((client) => client.id === project.clientId));
-    const groups = clients.map((client) => ({ ...client, count: projects.filter((project) => project.clientId === client.id).length }));
+    const unassigned = projectsForClient(projects, clients, 'unassigned', tasks);
+    const groups = clients.map((client) => ({ ...client, count: projectsForClient(projects, clients, client.id).length }));
     if (unassigned.length > 0) {
         groups.push({ id: 'unassigned', name: 'Unassigned projects', count: unassigned.length });
     }

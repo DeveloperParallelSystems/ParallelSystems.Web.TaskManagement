@@ -1,3 +1,5 @@
+import { clientScopeSearch, taskClientId } from '../projects/projectClients.js';
+
 export function taskIdFromPath(pathname) {
     const match = pathname.match(/^(?:\/projects\/(?:general|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?\/tasks\/(new|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i);
     if (!match) {
@@ -30,10 +32,19 @@ export function linkedTaskPath(task, projects = []) {
     return `${linkedTaskBase(task, projects)}/${task.id}`;
 }
 
-export function newChildTaskLocation(task, projects = []) {
+export function taskScopeLocation(task, projects = [], clients = [], search = '') {
+    return {
+        pathname: linkedTaskPath(task, projects),
+        search: withoutParentSelection(clientScopeSearch(search, taskClientId(task, projects, clients))),
+    };
+}
+
+export function newChildTaskLocation(task, projects = [], search = '', clients = []) {
+    const parameters = new URLSearchParams(clientScopeSearch(search, taskClientId(task, projects, clients)));
+    parameters.set('parentTaskId', task.id);
     return {
         pathname: `${linkedTaskBase(task, projects)}/new`,
-        search: `?${new URLSearchParams({ parentTaskId: task.id })}`,
+        search: `?${parameters}`,
     };
 }
 

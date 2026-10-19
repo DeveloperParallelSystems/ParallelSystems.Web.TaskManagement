@@ -14,6 +14,8 @@ import { addCustomFieldReducers } from '../features/tasks/customFields.js';
 import { addDisciplineWorkflowReducers, emptyDisciplineWorkflows } from '../features/tasks/disciplineWorkflows.js';
 import { addTaskTransitionReducers } from '../features/tasks/taskTransitions.js';
 import { addStatusSettingsReducers, emptyStatusSettings } from '../features/tasks/liveStatuses.js';
+import { addFollowingReducers, reconcileFollowing } from '../features/tasks/taskFollowing.js';
+import { addNotificationInboxReducers, emptyNotificationInbox } from '../features/tasks/notificationInbox.js';
 
 export const loadTaskDetail = createAsyncThunk('workspace/detail', async ({ id }, { rejectWithValue, signal, getState }) => {
     try {
@@ -229,7 +231,11 @@ const emptyWorkspace = {
     labelMutations: {},
     dependencies: {},
     linkedTickets: {},
+    taskFollowing: {},
     notifications: { items: [], unreadCount: 0 },
+    notificationInbox: emptyNotificationInbox,
+    notificationSummaryRequestId: null,
+    notificationRefreshVersion: 0,
     status: 'idle',
     error: null,
     requestId: null,
@@ -258,6 +264,9 @@ const workspaceSlice = createSlice({
     },
     extraReducers(builder) {
         builder.addCase(loadWorkspace.pending, (state, action) => {
+            if (!state.notificationInbox.mutationId) {
+                state.notificationSummaryRequestId = action.meta.requestId;
+            }
             state.requestId = action.meta.requestId;
             state.status = 'loading';
             state.error = null;
@@ -272,12 +281,18 @@ const workspaceSlice = createSlice({
                 return !previous || previous.userId !== person.userId || previous.accountIsActive !== person.accountIsActive;
             });
             const previousTasks = state.tasks;
-            Object.assign(state, action.payload);
+            const { notifications, ...workspace } = action.payload;
+            Object.assign(state, workspace);
+            if (state.notificationSummaryRequestId === action.meta.requestId) {
+                state.notifications = notifications;
+            }
+            state.notificationRefreshVersion += 1;
             reconcileChecklists(state, previousTasks, bindingsChanged);
             reconcileLabelMutations(state, bindingsChanged);
             reconcileDependencies(state, previousTasks, bindingsChanged);
             reconcileLinkedTickets(state, previousTasks, bindingsChanged);
             reconcileTaskColumns(state, bindingsChanged);
+            reconcileFollowing(state);
             if (bindingsChanged) {
                 state.taskTransitions = {};
                 state.details = {};
@@ -368,6 +383,8 @@ const workspaceSlice = createSlice({
         addDisciplineWorkflowReducers(builder);
         addTaskTransitionReducers(builder);
         addStatusSettingsReducers(builder);
+        addFollowingReducers(builder);
+        addNotificationInboxReducers(builder);
         builder.addCase(logout.fulfilled, () => emptyWorkspace);
         builder.addCase(authSlice.actions.sessionExpired, () => emptyWorkspace);
         builder.addCase(login.fulfilled, () => emptyWorkspace);

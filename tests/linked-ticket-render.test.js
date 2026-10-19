@@ -37,12 +37,12 @@ test('linked tickets render both directions, safe links, permissions and indepen
         const admin = render(true);
         assert.match(admin, /Linked tickets/);
         assert.doesNotMatch(admin, /Blocked by|Dependencies|>Blocks</);
-        assert.match(admin, /href="\/projects\/current-project\/tasks\/new\?parentTaskId=task"/);
+        assert.match(admin, /href="\/projects\/current-project\/tasks\/new\?view=list&amp;client=unassigned&amp;parentTaskId=task"/);
         assert.match(admin, /Parent ticket/);
         assert.match(admin, />Child tickets</);
         assert.match(admin, /Add child ticket/);
         assert.match(admin, /Unlink TASK-2/);
-        assert.match(admin, /href="\/projects\/project\/tasks\/linked\?view=list"/);
+        assert.match(admin, /href="\/projects\/project\/tasks\/linked\?view=list&amp;client=unassigned"/);
         assert.match(admin, /&lt;script&gt;/);
         assert.doesNotMatch(admin, /<script>|secret-id|Hidden task|SECRET/);
         assert.match(admin, /links do not block progress/);
@@ -56,8 +56,8 @@ test('linked tickets render both directions, safe links, permissions and indepen
         assert.match(hiddenOnly, /No visible linked tickets/);
         assert.doesNotMatch(hiddenOnly, /standalone|SECRET|secret-id|Hidden task/);
         const historicalProjects = render(true, [linked, hidden], [linked], []);
-        assert.match(historicalProjects, /href="\/tasks\/linked\?view=list"/);
-        assert.match(historicalProjects, /href="\/tasks\/new\?parentTaskId=task"/);
+        assert.match(historicalProjects, /href="\/tasks\/linked\?view=list&amp;client=unassigned"/);
+        assert.match(historicalProjects, /href="\/tasks\/new\?view=list&amp;client=unassigned&amp;parentTaskId=task"/);
         assert.doesNotMatch(historicalProjects, /href="\/projects\/|secret-id|Hidden task|SECRET/);
     }
     finally {

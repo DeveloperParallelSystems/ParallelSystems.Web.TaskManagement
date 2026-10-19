@@ -1,0 +1,11 @@
+.following-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.following-filter .checkbox {
+    margin: 0;
+}

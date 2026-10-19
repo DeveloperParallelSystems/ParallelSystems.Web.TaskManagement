@@ -55,8 +55,8 @@ export function projectFieldDraft(drafts, projectId, task) {
     return { ...loaded, ...drafts[projectId] };
 }
 
-export function customTaskPayload({ projectId, page, revision, values, administrator, error = null, invalidated = false }) {
-    if (!administrator || !projectId || !Object.keys(values || {}).length) {
+export function customTaskPayload({ projectId, page, revision, values, canEdit, error = null, invalidated = false }) {
+    if (!canEdit || !projectId || !Object.keys(values || {}).length) {
         return {};
     }
     if (!page || page.projectId !== projectId || error) {

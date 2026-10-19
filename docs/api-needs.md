@@ -1,5 +1,11 @@
 # Task Management API extensions
 
+## Notification inbox — current contract (2026-10-20)
+
+- GET `/notifications?filter=all|unread&page=1` returns `{items,unreadCount,totalCount,page,pageSize}`. The fixed page size is 25. Items are unread first, newest ID first within each group; counts include only the caller's notifications for currently accessible tasks. `unreadCount` covers all pages independently of the filter; `totalCount` matches the selected filter. Omitted queries default to All/page 1. Nonpositive pages or unknown filters return 400; pages past the end clamp to the last page, or page 1 for an empty inbox. No-store responses.
+- POST `/notifications/read-all` marks every currently accessible unread notification for the caller as read, across all pages, and returns 204. Idempotent; read history, other recipients and inaccessible task notifications are preserved. Existing POST `/notifications/{id}/read` remains scoped and available.
+- The Notifications page stores filter/page in its URL, shows exact unread and filtered totals, and uses Previous/Next. Desktop/mobile badges cap at `99+`. Read mutations refresh the selected page; Mark all resets to page 1. Request identity guards prevent pre-mutation refreshes and expired-session replies from restoring old counts. No native desktop notifier or general notification endpoints change. Deploy updated Server before frontend.
+
 ## Project custom fields — current contract (2026-10-19)
 
 - GET `/projects/{projectId}/custom-fields` returns `{version,projectId,canManage,fields:[{id,name,type,isArchived}]}` using the global task-column revision. Members see active definitions; administrators also see archived definitions. Existing project visibility and administrator mutation permissions apply.
@@ -120,13 +126,14 @@ Existing `WorkTaskRecord` responses omit `createdById`, although task creation i
 - DB/evidence: Server tables `029_work_task_checklist_state.sql`, `030_work_task_checklist_items.sql`, `031_work_task_checklist_history.sql`, `sp_WorkTaskChecklistGet/Save`, additive `sp_WorkTasksGet` projection, `WorkTaskChecklistController`, `WorkTaskChecklistRepository`, `ChecklistChecks.cs`; frontend `TaskChecklist.jsx`, `checklistState.js`, `checklistEditor.js`, checklist tests. Reordering uses accessible Move up/Move down controls.
 - Child tickets are separate tasks with independent visibility, status and owners, using the Linked tickets contract above. There are no `/subtasks` endpoints.
 
-## 4. Watchers/followers
+## 4. Following — implemented
 
-- `GET /tasks/{id}/followers` → `{ following: boolean, items: [{ userId, name }] }`.
-- `PUT /tasks/{id}/followers/me` with `{ following: boolean }` → `{ following }`.
-- `PUT /tasks/{id}/followers/{userId}` with `{ following }` → follower state (administrator only).
-- Permissions: only people who already have task access may follow. Following never grants visibility. Ordinary participants may see current authorized followers; administrative changes may only add eligible users. Removed/deactivated participants stop receiving updates.
-- DB: unique `(task_id, user_id)` follower rows and event subscriptions; notifications deduplicated with direct assignee/mention recipients. Cleanup or suppress invalid followers on reassignment.
+- `PUT /tasks/{id}/follow` follows; `DELETE /tasks/{id}/follow` unfollows. Both return `{ isFollowed: boolean }`, are idempotent and derive the account from the Task Management session. No body or task version is required.
+- Existing task list/detail records add actor-specific `isFollowed`. Only project task workspaces use `?following=1` to filter the already permission-scoped task list while preserving project-specific presentation. Client/project directory pages and the global task list do not apply the filter. No separate Following page or list endpoint is needed.
+- Only users with existing task access may follow. Following never grants visibility, changes task version/ownership or saves task edits. There is no follower roster or administrator subscription-on-behalf API in this implementation.
+- Table `058_work_task_followers` has unique `(task_id, user_id)` rows and no foreign keys. SQL validates associations and serializes changes on the task lock; explicit Task Management reset clears subscriptions. Access loss/inactive accounts suppress delivery and visibility; subscriptions can resume when access is restored.
+- Status, Assigned To, due-date and new-comment changes deliver in-app notifications in the originating transaction. Exclude the actor and deduplicate against direct assignment/mention recipients for that operation. Comment edits and unrelated task detail changes do not generate follower alerts. Notification read state is independent of following. No email/desktop delivery is added.
+- Evidence: Server `WorkTaskFollowingController`, `WorkTaskFollowingRepository`, `sp_WorkTaskFollowingSave`, `sp_WorkTaskFollowersNotify`, `TaskFollowingChecks`; frontend `taskFollowing.js`, `TaskFollowButton.jsx` and the project task following filter.
 
 ## 5. Labels — implemented; configurable disciplines — proposed
 
@@ -181,7 +188,7 @@ The following extensions remain proposed and are not prerequisites for the deadl
 ## 9. Server pagination, search and sorting
 
 - Proposed opt-in `GET /tasks?pageSize=50&cursor=&q=&discipline=&status=&projectId=&quickView=&sort=updatedAtUtc&direction=desc` → `{ items: [task], nextCursor, totalCount, summary: { total, inProgress, inReview, completed } }`.
-- Proposed opt-in `GET /notifications?pageSize=50&cursor=&q=&read=all|unread&sort=createdAtUtc&direction=desc` → `{ items: [notification], nextCursor, unreadCount }`.
+- Notification pagination and All/Unread filtering are implemented by the current contract above. Free-text notification search and configurable sorting remain unimplemented.
 - Keep existing unpaged responses compatible until callers migrate; alternatively introduce a separately versioned contract. Do not silently replace the existing task array with an envelope.
 - Permissions: apply actor visibility before search, counts, sort and pagination; quick views derive the actor from the cookie, not a submitted user ID. Creator view requires `createdById`. Searches include descriptions and authorized participant display names. Whitelist sort keys/directions; parameterize values.
 - DB: stable cursor ordering with unique ID tie-breaker, indexes for assignee/reviewer/release owner/creator, dates and status. Consider full-text indexing only after measuring search volume. Define page-size cap, cursor validation and time-zone semantics for overdue. Dashboard aggregate counts must not depend on the current page.

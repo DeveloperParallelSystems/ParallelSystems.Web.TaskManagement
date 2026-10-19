@@ -5,13 +5,13 @@ import { Link as LinkIcon, Plus } from 'lucide-react';
 import TaskPanelHeading from './TaskPanelHeading';
 import { loadWorkspace } from '../../app/store';
 import { addLinkedTicket, loadLinkedTickets, removeLinkedTicket } from './linkedTicketState.js';
-import { newChildTaskLocation, linkedTaskPath } from './taskNavigation';
+import { newChildTaskLocation, taskScopeLocation } from './taskNavigation';
 import { taskStatusName } from './taskWorkflow';
 
 export default function TaskLinkedTickets({ task, disabled, onEditingChange, onSaved, onFailure, onReloadTask }) {
     const dispatch = useDispatch();
     const location = useLocation();
-    const { tasks, projects = [], linkedTickets } = useSelector((state) => state.workspace);
+    const { tasks, projects = [], clients = [], linkedTickets } = useSelector((state) => state.workspace);
     const current = linkedTickets?.[task.id];
     const [selected, setSelected] = useState('');
     const [relationship, setRelationship] = useState('child');
@@ -103,7 +103,7 @@ export default function TaskLinkedTickets({ task, disabled, onEditingChange, onS
             {items.map((item) => {
                 const latest = tasks.find((candidate) => candidate.id === item.taskId);
                 return <li key={item.taskId}>
-                    <Link to={{ pathname: linkedTaskPath(latest, projects), search: location.search }}>
+                    <Link to={taskScopeLocation(latest, projects, clients, location.search)}>
                         <strong>{latest.code || item.code}</strong> {latest.title || item.title}
                     </Link>
                     <span className="muted">{taskStatusName(latest.status ? latest : item)}</span>
@@ -152,7 +152,7 @@ export default function TaskLinkedTickets({ task, disabled, onEditingChange, onS
         {canManage && <details className="linked-ticket-editor">
             <summary><Plus size={15} aria-hidden="true" /> Link a ticket</summary>
             <div className="linked-ticket-editor-body">
-                <Link className="button" to={newChildTaskLocation(task, projects)}
+                <Link className="button" to={newChildTaskLocation(task, projects, location.search, clients)}
                     aria-disabled={unavailable || dirty}
                     onClick={(event) => {
                         if (unavailable || dirty) {

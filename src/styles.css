@@ -2119,18 +2119,19 @@ progress::-webkit-progress-value {
     flex-direction: column;
     gap: 8px;
     width: 100%;
-    padding: 18px;
+    padding: 18px var(--notification-inset);
     border: 0;
     border-top: 1px solid #e2e8f0;
     background: transparent;
     color: inherit;
     text-align: left;
     cursor: pointer;
+    overflow-wrap: anywhere;
 }
 
 .notification-item.unread {
     background: #f0fdf4;
-    border-left: 3px solid #16a34a;
+    box-shadow: inset 3px 0 #16a34a;
 }
 
 .notification-item:not(:disabled):hover {
@@ -2291,5 +2292,60 @@ progress::-webkit-progress-value {
     }
     .toast {
         max-width: calc(100% - 32px);
+    }
+}
+
+.notification-panel {
+    --notification-inset: 24px;
+    padding: 0;
+}
+
+.notification-heading,
+.notification-toolbar,
+.notification-pagination,
+.notification-actions,
+.notification-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.notification-heading,
+.notification-toolbar,
+.notification-pagination {
+    justify-content: space-between;
+}
+
+.notification-heading {
+    padding: 24px var(--notification-inset) 16px;
+}
+
+.notification-heading h2 {
+    margin: 0 0 6px;
+}
+
+.notification-toolbar {
+    padding: 0 var(--notification-inset) 16px;
+}
+
+.notification-pagination {
+    padding: 16px var(--notification-inset);
+    border-top: 1px solid var(--line);
+}
+
+.notification-panel > .error,
+.notification-panel > .empty {
+    margin: 0 var(--notification-inset) 20px;
+}
+
+@media (max-width: 600px) {
+    .notification-panel {
+        --notification-inset: 16px;
+    }
+
+    .notification-heading {
+        align-items: flex-start;
+        padding-top: 16px;
     }
 }

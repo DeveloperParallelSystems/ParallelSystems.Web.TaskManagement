@@ -80,7 +80,7 @@ test('sorts due dates, priority, updated dates and titles without mutating input
 });
 
 test('URL state round trips special characters, every control and preserves unrelated query keys', () => {
-    const state = { search: 'QA & drawings + café', discipline: 'Drafting', status: 'In Review', projectId: 'project-id', mine: true, labelIds: [], quickView: 'review', sort: 'dueDate', direction: 'asc', view: 'list', assigneeId: '', month: '' };
+    const state = { search: 'QA & drawings + café', discipline: 'Drafting', status: 'In Review', projectId: 'project-id', mine: true, followingOnly: true, labelIds: [], quickView: 'review', sort: 'dueDate', direction: 'asc', view: 'list', assigneeId: '', month: '' };
     const query = serializeTaskQuery(state, 'external=keep&q=old');
     assert.deepEqual(parseTaskQuery(query), state);
     assert.equal(new URLSearchParams(query).get('external'), 'keep');

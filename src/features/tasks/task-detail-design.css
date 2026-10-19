@@ -517,3 +517,13 @@
         grid-template-columns: minmax(0, 1fr);
     }
 }
+.task-follow-control {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 260px;
+}
+
+.task-follow-control .button[aria-pressed="true"] {
+    background: var(--sage-pale, #e9f1e3);
+}

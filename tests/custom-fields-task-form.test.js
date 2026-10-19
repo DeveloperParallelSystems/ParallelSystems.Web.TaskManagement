@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { requiredTaskColumns } from '../src/features/tasks/taskColumns.js';
 
-test('task form custom interactions retain project drafts, validate before save, and omit inaccessible/member payloads', async () => {
+test('task form custom interactions retain project drafts, validate before save, and respect detail permissions', async () => {
     const root = resolve('.tmp');
     mkdirSync(root, { recursive: true });
     const scratch = mkdtempSync(join(root, 'custom-task-form-'));
@@ -21,6 +21,7 @@ let slots = [];
 let index = 0;
 let state;
 let loaded;
+let detailEffect;
 export function reset(next, task = null) { state = next; loaded = task; slots = []; }
 export function renderStart() { index = 0; }
 export function snapshot() { return state; }
@@ -28,23 +29,32 @@ export function useState(initial) {
     const slot = index++;
     if (!(slot in slots)) {
         slots[slot] = typeof initial === 'function' ? initial() : initial;
-        if (slot === 0) { slots[slot] = { ...slots[slot], title: 'Task', originalAssigneeId: 'staff', projectId: 'project', ...loaded }; }
-        if (slot === 1 && loaded) { slots[slot] = { task: slots[0], canEditDetails: state.auth.user.role === 'Administrator', allowedStatuses: [], activity: [] }; }
+        if (slot === 0) { slots[slot] = { ...slots[slot], title: 'Task', originalAssigneeId: 'staff', assigneeId: 'staff', projectId: 'project', ...loaded }; }
+        if (slot === 1 && loaded) { slots[slot] = { task: slots[0], canEditDetails: state.canEditDetails ?? true, allowedStatuses: [], activity: [] }; }
         if (slot === 2) { slots[slot] = false; }
         if (slot === 15) { slots[slot] = true; }
     }
     return [slots[slot], (value) => { slots[slot] = typeof value === 'function' ? value(slots[slot]) : value; }];
 }
-export function useEffect() {}
+export function useEffect(effect, dependencies) {
+    if (dependencies?.length === 3 && dependencies[0] === 'existing' && typeof dependencies[1] === 'number') {
+        detailEffect = effect;
+    }
+}
+export async function refreshDetails() {
+    detailEffect();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+}
+export function loadedDetails() { return slots[1]; }
 export function useRef() { return { current: null }; }
 export function useSelector(select) { return select(state); }
 export function useDispatch() { return (action) => typeof action === 'function' ? action(() => {}, () => state) : action; }
 export function useBlocker() { return { state: 'unblocked' }; }
-export function useLocation() { return { search: '' }; }
-export function useNavigate() { return () => {}; }
+export function useLocation() { return state.location || { search: '' }; }
+export function useNavigate() { return (location) => { state.navigation = location; }; }
 `);
         const entry = join(scratch, 'entry.jsx');
-        writeFileSync(entry, "export { default as TaskPage } from '../../src/features/tasks/TaskPage.jsx';\nexport { reset, renderStart, snapshot } from './hooks.js';");
+        writeFileSync(entry, "export { default as TaskPage } from '../../src/features/tasks/TaskPage.jsx';\nexport { reset, renderStart, snapshot, refreshDetails, loadedDetails } from './hooks.js';");
         const bundle = await build({ configFile: false, logLevel: 'silent', plugins: [{
             name: 'form-hooks', enforce: 'pre', transform(source, id) {
                 if (id.replaceAll('\\', '/').endsWith('/src/features/tasks/TaskPage.jsx')) {
@@ -54,7 +64,7 @@ export function useNavigate() { return () => {}; }
         }, react()], build: { ssr: entry, write: false } });
         const file = join(scratch, 'form.mjs');
         writeFileSync(file, bundle.output.find((chunk) => chunk.isEntry).code);
-        const { TaskPage, reset, renderStart, snapshot } = await import(pathToFileURL(file).href);
+        const { TaskPage, reset, renderStart, snapshot, refreshDetails, loadedDetails } = await import(pathToFileURL(file).href);
         const field = { id: '11111111-1111-1111-1111-111111111111', name: 'Date Started', type: 'Date', isArchived: false };
         const state = { auth: { user: { role: 'Administrator' } }, workspace: {
             projects: [{ id: 'project', name: 'Project' }, { id: 'other', name: 'Other' }], tasks: [], people: [],
@@ -70,9 +80,17 @@ export function useNavigate() { return () => {}; }
         reset(state);
         globalThis.window = { confirm: () => true };
         const calls = [];
+        let idOnly = false;
+        let detailReply;
         globalThis.fetch = async (url, options) => {
+            if (!options.method || options.method === 'GET') {
+                return new Response(JSON.stringify(detailReply));
+            }
             calls.push({ url, body: JSON.parse(options.body) });
-            return new Response(JSON.stringify({ id: 'created' }));
+            if (idOnly) {
+                return new Response(JSON.stringify({ id: 'existing' }));
+            }
+            return new Response(JSON.stringify({ id: 'created', version: (JSON.parse(options.body).version || 0) + 1 }));
         };
         function descendants(element) {
             if (Array.isArray(element)) {
@@ -89,6 +107,10 @@ export function useNavigate() { return () => {}; }
         const form = () => render().find((element) => element.props.id === 'task-details-form');
         const projectSelect = () => render().find((element) => element.type === 'select' && element.props.value === 'project');
         assert.ok(custom(), 'Project fields must mount in the actual task form');
+        assert.equal(render().some(element => element.type === 'span' && element.props.children === 'Original assignee'), false,
+            'New tasks respect hidden Original assignee');
+        assert.equal(render().some(element => element.type === 'span' && element.props.children === 'Reviewer / QA'), false,
+            'New tasks respect hidden QA');
         assert.equal(render().some((element) => element.type === 'span' && element.props.children === 'Release owner'), false,
             'New tasks must not expose the unconfigured legacy release-owner field');
         custom().props.onChange(field.id, '2026-10-19');
@@ -102,6 +124,7 @@ export function useNavigate() { return () => {}; }
         assert.equal(calls[0].url, '/api/task-management/tasks/live');
         assert.deepEqual(calls[0].body.customFieldValues, [{ fieldId: field.id, value: '2026-10-19' }]);
         assert.equal(calls[0].body.customFieldVersion, 7);
+        assert.equal(calls[0].body.originalAssigneeId, 'staff', 'Hidden original assignee comes from Assigned To');
         custom().props.onChange(field.id, '2026-02-30');
         await form().props.onSubmit({ preventDefault() {} });
         assert.equal(calls.length, 1, 'Invalid values must not reach the API');
@@ -109,6 +132,8 @@ export function useNavigate() { return () => {}; }
         await form().props.onSubmit({ preventDefault() {} });
         assert.equal(calls.length, 1, 'Stale definitions must not reach the API');
         snapshot().workspace.projects = [];
+        taskId = 'existing';
+        reset(state, { id: taskId, projectId: 'project', version: 2 });
         await form().props.onSubmit({ preventDefault() {} });
         assert.equal(calls.at(-1).body.customFieldValues, undefined, 'Historical inaccessible project skips custom payload');
         state.workspace.projects = [{ id: 'project', name: 'Project' }, { id: 'other', name: 'Other' }];
@@ -151,9 +176,38 @@ export function useNavigate() { return () => {}; }
         assert.deepEqual(calls.at(-1).body.customFieldValues, [{ fieldId: field.id, value: null }]);
         state.auth.user.role = 'User';
         reset(state, { id: taskId, projectId: 'project', customFieldValues: [{ fieldId: field.id, value: '2026-10-01' }], version: 4 });
-        assert.equal(custom().props.editable, false);
+        assert.equal(custom().props.editable, true, 'Participants can edit configured project values');
+        custom().props.onChange(field.id, '2026-10-24');
+        const memberControl = (label, type) => {
+            const fieldLabel = render().find((element) => element.type === 'label' &&
+                descendants(element).some((child) => child.type === 'span' && child.props.children === label));
+            return descendants(fieldLabel).find((element) => element.type === type);
+        };
+        assert.equal(render().find((element) => element.type === 'fieldset').props.disabled, false);
+        memberControl('Task title', 'input').props.onChange({ target: { value: 'Member title' } });
+        memberControl('Description', 'textarea').props.onChange({ target: { value: 'Member description' } });
+        memberControl('Priority', 'select').props.onChange({ target: { value: 'High' } });
+        memberControl('Due date', 'input').props.onChange({ target: { value: '2026-10-25' } });
+        assert.equal(memberControl('Assigned To', 'select').props.disabled, false);
+        memberControl('Assigned To', 'select').props.onChange({ target: { value: 'new-owner' } });
         await form().props.onSubmit({ preventDefault() {} });
-        assert.equal(calls.at(-1).body.customFieldValues, undefined, 'Member saves must omit custom field edits');
+        assert.deepEqual(calls.at(-1).body.customFieldValues, [{ fieldId: field.id, value: '2026-10-24' }]);
+        assert.equal(calls.at(-1).body.title, 'Member title');
+        assert.equal(calls.at(-1).body.description, 'Member description');
+        assert.equal(calls.at(-1).body.priority, 'High');
+        assert.equal(calls.at(-1).body.dueDate, '2026-10-25');
+        assert.equal(calls.at(-1).body.assigneeId, 'new-owner');
+        const memberProject = render().find((element) => element.type === 'select' && element.props.value === 'project');
+        assert.equal(memberProject.props.disabled, true, 'Project moves remain admin-only');
+        memberProject.props.onChange({ target: { value: 'other' } });
+        assert.equal(render().find((element) => element.type === 'select' && element.props.value === 'project')?.props.disabled, true);
+        state.canEditDetails = false;
+        reset(state, { id: taskId, projectId: 'project', version: 5 });
+        assert.equal(custom().props.editable, false, 'Server permission controls editability');
+        custom().props.onChange(field.id, '2026-10-25');
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.customFieldValues, undefined, 'Read-only forms omit custom edits');
+        delete state.canEditDetails;
         state.auth.user.role = 'Administrator';
         reset(state, { id: taskId, projectId: 'project', status: 'To Do', version: 9 });
         const statusSelect = render().find((element) => element.type === 'select' && element.props['aria-label'] === 'Status');
@@ -202,6 +256,87 @@ export function useNavigate() { return () => {}; }
         assert.equal(disciplineSelect().props.disabled, true, 'Only admins may change discipline');
         disciplineSelect().props.onChange({ target: { value: 'Drafting' } });
         assert.equal(disciplineSelect().props.value, 'Development', 'Member event handlers cannot change discipline');
+        state.auth.user.role = 'Administrator';
+        state.workspace.clients = [{ id: 'client-a', name: 'Client A' }, { id: 'client-b', name: 'Client B' }];
+        state.workspace.projects[0].clientIds = ['client-a', 'client-b'];
+        const clientSelect = () => render().find((element) => element.type === 'label' &&
+            descendants(element).some((child) => child.type === 'span' && child.props.children === 'Client'));
+        reset(state, { id: taskId, projectId: 'project', clientId: 'client-a', status: 'To Do', version: 12 });
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(Object.hasOwn(calls.at(-1).body, 'clientId'), false, 'An ordinary task save preserves the persisted client by omission');
+        assert.equal(clientSelect(), undefined, 'Client is inherited from navigation, never edited in the task form');
+        custom().props.onChange(field.id, '2026-10-23');
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(Object.hasOwn(calls.at(-1).body, 'clientId'), false);
+        assert.deepEqual(calls.at(-1).body.customFieldValues, [{ fieldId: field.id, value: '2026-10-23' }], 'Saving retains the same project field definitions and values');
+        const savedVersion = calls.at(-1).body.version + 1;
+        const description = render().find((element) => element.type === 'textarea');
+        description.props.onChange({ target: { value: 'Edit immediately after saving' } });
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.version, savedVersion, 'A subsequent edit uses the saved revision');
+        reset(state, { id: taskId, projectId: 'project', clientId: 'removed', version: 13 });
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(Object.hasOwn(calls.at(-1).body, 'clientId'), false, 'Unrelated edits preserve historical detached client associations');
+        taskId = 'new';
+        state.location = { search: '?client=client-b' };
+        reset(state);
+        // A scoped create uses the route project before the test fixture fills its title.
+        renderStart();
+        const scopedCreate = descendants(TaskPage({ id: taskId, projectScope: 'project', onEditingChange() {}, onClose() {}, onSaved() {} }));
+        await scopedCreate.find((element) => element.props.id === 'task-details-form').props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.clientId, 'client-b');
+        state.workspace.tasks = [{ id: 'parent-b', projectId: 'project', clientId: 'client-b' }];
+        state.location = { search: '?client=client-a&parentTaskId=parent-b' };
+        reset(state);
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.clientId, 'client-b', 'Child creation inherits the actual parent client over a stale query');
+        assert.equal(calls.at(-1).body.parentTaskId, 'parent-b');
+        taskId = 'existing';
+        reset(state, { id: taskId, projectId: 'project', clientId: 'client-a', version: 20 });
+        assert.equal(clientSelect(), undefined, 'Client is inherited from navigation, never edited in the task form');
+        idOnly = true;
+        const savingTask = form().props.onSubmit({ preventDefault() {} });
+        assert.equal(clientSelect(), undefined, 'Saving never introduces a Client field');
+        await savingTask;
+        assert.equal(form(), undefined, 'The real id-only save contract suspends form editing until detail refresh');
+        assert.equal(render().find((element) => element.type === 'button' && element.props.type === 'submit').props.disabled, true,
+            'Save remains disabled while waiting for the saved revision');
+        detailReply = { task: { ...calls.at(-1).body, id: taskId, version: 21 }, canEditDetails: true,
+            allowedStatuses: [], activity: [{ description: 'Task updated' }] };
+        render();
+        await refreshDetails();
+        assert.equal(loadedDetails().activity[0].description, 'Task updated', 'Saves refresh History');
+        render().find((element) => element.type === 'textarea').props.onChange({ target: { value: 'Second edit after save' } });
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.version, 21, 'A second edit after id-only save uses the refreshed revision');
+        assert.equal(Object.hasOwn(calls.at(-1).body, 'clientId'), false, 'The client remains unchanged after saving');
+        state.auth.user.role = 'User';
+        taskId = 'existing';
+        reset(state, { id: taskId, projectId: 'project', clientId: 'client-b', version: 14 });
+        assert.equal(clientSelect(), undefined, 'Members also inherit client context without a Client field');
+        state.auth.user.role = 'Administrator';
+        taskId = 'new';
+        idOnly = false;
+        reset(state, { assigneeId: '', originalAssigneeId: 'stale-original' });
+        const beforeMissingOwner = calls.length;
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.length, beforeMissingOwner, 'Hidden original requires an initial Assigned To selection');
+        reset(state, { assigneeId: 'initial-owner', originalAssigneeId: 'stale-original', reviewerId: 'hidden-reviewer' });
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.originalAssigneeId, 'initial-owner');
+        assert.equal(calls.at(-1).body.reviewerId, null, 'Hidden QA drafts do not assign someone during creation');
+        state.workspace.taskColumns['project:Development'].data.columns.push('originalAssignee', 'qa');
+        reset(state, { assigneeId: 'current-owner', originalAssigneeId: 'chosen-original', reviewerId: 'chosen-reviewer' });
+        assert.equal(render().some(element => element.type === 'span' && element.props.children === 'Original assignee'), true);
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.originalAssigneeId, 'chosen-original');
+        assert.equal(calls.at(-1).body.reviewerId, 'chosen-reviewer');
+        state.workspace.taskColumns['project:Development'].data.columns = [...requiredTaskColumns];
+        taskId = 'existing';
+        reset(state, { id: taskId, originalAssigneeId: 'historic-original', assigneeId: 'different-owner', reviewerId: 'historic-reviewer', version: 22 });
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.originalAssigneeId, 'historic-original', 'Hidden original is never replaced on an existing task');
+        assert.equal(calls.at(-1).body.reviewerId, 'historic-reviewer', 'Hiding QA does not clear existing assignments');
     }
     finally {
         globalThis.fetch = originalFetch;

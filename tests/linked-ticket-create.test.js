@@ -10,11 +10,14 @@ import { pathToFileURL } from 'node:url';
 import { linkedTaskPath, newChildTaskLocation, withoutParentSelection } from '../src/features/tasks/taskNavigation.js';
 
 test('child creation inherits the project and encodes the parent selection', () => {
+    assert.deepEqual(newChildTaskLocation({ id: 'parent', projectId: 'project' }, [{ id: 'project' }], '?following=1&view=list&parentTaskId=old'), {
+        pathname: '/projects/project/tasks/new', search: '?following=1&view=list&parentTaskId=parent&client=unassigned',
+    });
     assert.deepEqual(newChildTaskLocation({ id: 'parent', projectId: 'project' }, [{ id: 'project' }]), {
-        pathname: '/projects/project/tasks/new', search: '?parentTaskId=parent',
+        pathname: '/projects/project/tasks/new', search: '?client=unassigned&parentTaskId=parent',
     });
     assert.deepEqual(newChildTaskLocation({ id: 'parent', projectId: null }), {
-        pathname: '/projects/general/tasks/new', search: '?parentTaskId=parent',
+        pathname: '/projects/general/tasks/new', search: '?client=unassigned&parentTaskId=parent',
     });
 });
 
@@ -23,7 +26,7 @@ test('historical task projects omitted from lookups retain ordinary task and chi
     const projects = [{ id: 'available-project' }];
     assert.equal(linkedTaskPath(task, projects), '/tasks/parent');
     assert.deepEqual(newChildTaskLocation(task, projects), {
-        pathname: '/tasks/new', search: '?parentTaskId=parent',
+        pathname: '/tasks/new', search: '?client=unassigned&parentTaskId=parent',
     });
     assert.equal(linkedTaskPath({ id: 'known', projectId: 'available-project' }, projects), '/projects/available-project/tasks/known');
     assert.equal(linkedTaskPath({ id: 'general', projectId: null }, projects), '/projects/general/tasks/general');
@@ -84,6 +87,10 @@ export function useSelector(select) {
             { id: 'outside', code: 'TASK-2', title: 'Other project', projectId: 'outside-project' }],
         statusSettings: { data: { catalog: [], disciplines: [] } },
         taskColumnsRevision: 1,
+        taskColumns: {
+            'project:Development': { data: { version: 1, columns: ['originalAssignee'] } },
+            'default:Development': { data: { version: 1, columns: ['originalAssignee'] } },
+        },
         customFields: { project: { data: { version: 1, projectId: 'project', canManage: true, fields: [] } } },
     } });
 }
@@ -139,8 +146,8 @@ export function useNavigate() {
         const childHtml = renderToStaticMarkup(childForm);
         assert.match(childHtml, /Parent ticket \(optional\)/);
         assert.match(childHtml, /<option value="parent" selected="">TASK-1/);
-        assert.match(childHtml, /<optgroup label="This project">/);
-        assert.match(childHtml, /<optgroup label="Other projects and general tasks">/);
+        assert.match(childHtml, /<optgroup label="This client and project">/);
+        assert.match(childHtml, /<optgroup label="Other clients, projects and general tasks">/);
         await childForm.props.onSubmit({ preventDefault() {} });
         assert.equal(calls[0].url, '/api/task-management/tasks/live');
         assert.equal(calls[0].method, 'POST');
@@ -158,12 +165,12 @@ export function useNavigate() {
         await existing.props.onSubmit({ preventDefault() {} });
         assert.equal(calls[3].method, 'PUT');
         assert.equal(Object.hasOwn(calls[3].body, 'parentTaskId'), false);
-        const historicalParent = form('?parentTaskId=parent', true, null);
+        const historicalParent = form('?parentTaskId=outside', true, null);
         const historicalHtml = renderToStaticMarkup(historicalParent);
         assert.match(historicalHtml, /<span>Project<\/span><select form="task-details-form"><option value="" selected="">/);
-        assert.match(historicalHtml, /<option value="parent" selected="">TASK-1/);
+        assert.match(historicalHtml, /<option value="outside" selected="">TASK-2/);
         await historicalParent.props.onSubmit({ preventDefault() {} });
-        assert.equal(calls[4].body.parentTaskId, 'parent');
+        assert.equal(calls[4].body.parentTaskId, 'outside');
         assert.equal(calls[4].body.projectId, null);
     }
     finally {

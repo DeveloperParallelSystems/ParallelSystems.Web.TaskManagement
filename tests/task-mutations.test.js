@@ -57,6 +57,19 @@ test('bulk updates use full details and versions and report conflicts separately
         assert.equal(writes[0].input.dueDate, '2026-10-20');
         assert.equal(results[0].success, true);
         assert.equal(results[1].status, 409);
+        writes.length = 0;
+        const moved = await store.dispatch(bulkUpdateTasks({
+            tasks: [{ id: 'one', code: 'TASK-1', version: 2 }, { id: 'two', code: 'TASK-2', version: 2 }],
+            changes: { clientId: 'destination' },
+        })).unwrap();
+        assert.equal(writes.length, 1, 'Client moves must not overwrite a concurrently edited task');
+        assert.equal(writes[0].input.clientId, 'destination');
+        assert.equal(writes[0].input.assigneeId, 'worker');
+        assert.equal(writes[0].input.status, 'To Do');
+        assert.equal(writes[0].input.description, 'Preserve this detail');
+        assert.equal(Object.hasOwn(writes[0].input, 'customFieldValues'), false, 'Unchanged custom values remain on the server');
+        assert.equal(moved[0].success, true);
+        assert.equal(moved[1].status, 409);
     }
     finally {
         globalThis.fetch = originalFetch;

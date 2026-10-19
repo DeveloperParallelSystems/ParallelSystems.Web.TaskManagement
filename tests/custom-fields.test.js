@@ -46,13 +46,13 @@ test('task custom payload requires current definitions, preserves per-project dr
     const drafts = { [projectId]: changed };
     assert.deepEqual(projectFieldDraft(drafts, 'other-project', task), {});
     assert.deepEqual(projectFieldDraft(drafts, projectId, task), changed);
-    assert.deepEqual(customTaskPayload({ projectId, page, revision: 4, values: changed, administrator: true }), {
+    assert.deepEqual(customTaskPayload({ projectId, page, revision: 4, values: changed, canEdit: true }), {
         customFieldVersion: 4, customFieldValues: [{ fieldId, value: '2026-10-02' }],
     });
-    assert.throws(() => customTaskPayload({ projectId, page, revision: 5, values: changed, administrator: true }), /Reload/);
-    assert.throws(() => customTaskPayload({ projectId, page: null, revision: 4, values: changed, administrator: true }), /load/i);
-    assert.deepEqual(customTaskPayload({ projectId, page, revision: 4, values: changed, administrator: false }), {});
-    assert.deepEqual(customTaskPayload({ projectId: null, page, revision: 4, values: changed, administrator: true }), {});
+    assert.throws(() => customTaskPayload({ projectId, page, revision: 5, values: changed, canEdit: true }), /Reload/);
+    assert.throws(() => customTaskPayload({ projectId, page: null, revision: 4, values: changed, canEdit: true }), /load/i);
+    assert.deepEqual(customTaskPayload({ projectId, page, revision: 4, values: changed, canEdit: false }), {});
+    assert.deepEqual(customTaskPayload({ projectId: null, page, revision: 4, values: changed, canEdit: true }), {});
     assert.equal(taskInput(task).customFieldValues, undefined);
 });
 
@@ -61,12 +61,12 @@ test('sparse custom patches preserve unseen project and restored values unless e
     const restoredPage = { ...page, fields: [...page.fields, { id: restoredId, name: 'Retained note', type: 'Text', isArchived: false }] };
     const taskLoadedInB = { projectId: 'other-project', customFieldValues: [] };
     assert.deepEqual(projectFieldDraft({}, projectId, taskLoadedInB), {});
-    assert.deepEqual(customTaskPayload({ projectId, page: restoredPage, revision: 4, values: {}, administrator: true }), {},
+    assert.deepEqual(customTaskPayload({ projectId, page: restoredPage, revision: 4, values: {}, canEdit: true }), {},
         'Moving back to A without edits must preserve the unseen prior-project values');
-    assert.deepEqual(customTaskPayload({ projectId, page: restoredPage, revision: 4, values: { [fieldId]: '2026-10-19' }, administrator: true }), {
+    assert.deepEqual(customTaskPayload({ projectId, page: restoredPage, revision: 4, values: { [fieldId]: '2026-10-19' }, canEdit: true }), {
         customFieldVersion: 4, customFieldValues: [{ fieldId, value: '2026-10-19' }],
     }, 'Editing one field must not send or clear an unseen restored field');
-    assert.deepEqual(customTaskPayload({ projectId, page: restoredPage, revision: 4, values: { [restoredId]: '' }, administrator: true }), {
+    assert.deepEqual(customTaskPayload({ projectId, page: restoredPage, revision: 4, values: { [restoredId]: '' }, canEdit: true }), {
         customFieldVersion: 4, customFieldValues: [{ fieldId: restoredId, value: null }],
     }, 'Only an explicit clear sends null');
     const task = { projectId, customFieldValues: [{ fieldId, value: '2026-10-01' }, { fieldId: restoredId, value: 'Keep me' }] };

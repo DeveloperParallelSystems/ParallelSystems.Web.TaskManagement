@@ -17,6 +17,8 @@ import TaskCalendar, { useLocalToday } from './TaskCalendar';
 import { calendarFilterOptions } from './calendar';
 import { columnLabels, defaultTaskColumns, listTaskColumns, loadTaskColumns, requiredTaskColumns, taskColumnLabels, useTaskColumnProfiles } from './taskColumns';
 import TaskColumnContent from './TaskColumnContent';
+import FollowingFilter from './FollowingFilter';
+import { projectClientContext, tasksForProjectClient } from '../projects/projectClients';
 
 export function Stats({ tasks }) {
     const items = [
@@ -75,14 +77,24 @@ export default function TasksPage({ onOpen, projectScope = null }) {
     const labelsByColumn = columnLabels(Object.values(columnResources).flatMap((resource) => resource.data?.customFields || []));
     const projectLayout = useSelector((state) => state.workspace.projectPresentations?.[layoutProjectId]);
     const groups = useSelector((state) => layoutProjectId ? selectProjectPresentationGroups(state, layoutProjectId) : selectPresentationGroups(state));
-    const { tasks: workspaceTasks, projects, people, details, bulkBusy, labels = [] } = useSelector((state) => state.workspace);
-    const tasks = projectScope ? workspaceTasks.filter((task) => projectScope === 'general' ? !task.projectId : task.projectId === projectScope) : workspaceTasks;
+    const { tasks: workspaceTasks, projects, clients = [], people, details, bulkBusy, labels = [] } = useSelector((state) => state.workspace);
     const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
     const disciplineWorkflows = useSelector((state) => state.workspace.disciplineWorkflows?.data?.items);
     const user = useSelector((state) => state.auth.user);
     const administrator = user.role === 'Administrator';
     const [params, setParams] = useSearchParams();
+    const project = projects.find((item) => item.id === projectScope);
+    const clientId = projectClientContext(project, clients, params);
+    let scopedTasks = workspaceTasks;
+    if (projectScope === 'general') {
+        scopedTasks = clientId === undefined ? [] : workspaceTasks.filter((task) => !task.projectId);
+    }
+    else if (projectScope) {
+        scopedTasks = project && clientId !== undefined ? tasksForProjectClient(workspaceTasks, project, clients, clientId) : [];
+    }
     const filters = parseTaskQuery(params);
+    const followingOnly = Boolean(projectScope) && filters.followingOnly;
+    const tasks = followingOnly ? scopedTasks.filter((task) => task.isFollowed) : scopedTasks;
     if (projectScope) {
         filters.projectId = '';
     }
@@ -232,6 +244,7 @@ export default function TasksPage({ onOpen, projectScope = null }) {
             </p>}
             {!columnsReady && view === 'list' && <p role="status">Task columns are unavailable or still loading. Board and calendar remain available.</p>}
             <Stats tasks={tasks} />
+            {projectScope && <FollowingFilter />}
             <section className="toolbar" aria-label="Task filters">
                 <button type="button" className="button mobile-filter-toggle" aria-expanded={mobileFiltersOpen}
                     aria-controls="task-filter-controls" onClick={() => setMobileFiltersOpen((open) => !open)}>
@@ -386,8 +399,8 @@ export default function TasksPage({ onOpen, projectScope = null }) {
             {!visible.length && (
                 <section className="empty panel">
                     <div className="empty-icon">✓</div>
-                    <h2>{tasks.length ? 'No matching tasks' : 'A clear place to start'}</h2>
-                    <p>{emptyMessage}</p>
+                    <h2>{tasks.length ? 'No matching tasks' : followingOnly ? 'No followed tasks yet' : 'A clear place to start'}</h2>
+                    <p>{followingOnly && !tasks.length ? 'Open a task and select Follow to keep it here and receive updates.' : emptyMessage}</p>
                 </section>
             )}
             {view === 'calendar' && <TaskCalendar tasks={visible} people={people} month={filters.month} today={today}
