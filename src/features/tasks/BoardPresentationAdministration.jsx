@@ -22,7 +22,7 @@ export default function BoardPresentationAdministration({ onEditingChange }) {
         return !editing.saving && (!editing.dirty || window.confirm('Discard your unsaved board changes and switch layouts?'));
     }
 
-    return <>
+    return <div className="board-presentation-admin">
         <div className="presentation-scope" aria-label="Board presentation scope">
             <label>Layout
                 <select value={mode} disabled={editing.saving} onChange={(event) => {
@@ -65,6 +65,15 @@ export default function BoardPresentationAdministration({ onEditingChange }) {
             projectName={mode === 'project' ? selectedProject.name : ''}
             clientName={selectedClient?.name || 'Unassigned projects'}
             onEditingChange={reportEditing} />
-            : <p className="hint">Select a client and project to view its board presentation.</p>}
-    </>;
+            : <section className="presentation-management" aria-labelledby="presentation-heading">
+                <header className="presentation-page-heading">
+                    <div>
+                        <p className="presentation-eyebrow">Administration · Project layout</p>
+                        <h1 id="presentation-heading">Board presentation</h1>
+                        <p className="hint">Customize columns for this project, or follow the shared default. Task statuses and workflow rules stay unchanged.</p>
+                    </div>
+                </header>
+                <p className="hint">Select a client and project to view its board presentation.</p>
+            </section>}
+    </div>;
 }

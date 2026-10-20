@@ -151,6 +151,15 @@ export { reset, renderStart } from './hooks.js';
             props = { onEditingChange() {} };
             reset(state);
             render().find((element) => element.type === 'select').props.onChange({ target: { value: 'project' } });
+            function assertSelectionHeading() {
+                const elements = render();
+                const headings = elements.filter((element) => element.type === 'h1');
+                assert.equal(headings.length, 1, 'Project selection must retain the page heading');
+                assert.equal(headings[0].props.id, Administration === Board ? 'presentation-heading' : 'task-columns-heading');
+                assert.ok(elements.some((element) => element.type === 'p' &&
+                    String(element.props.children).startsWith('Select a client and project')));
+            }
+            assertSelectionHeading();
             function selectWithOption(value) {
                 return render().find((element) => element.type === 'select' &&
                     descendants(element).some((child) => child.type === 'option' && child.props.value === value));
@@ -158,6 +167,7 @@ export { reset, renderStart } from './hooks.js';
             let editorKey;
             for (const clientId of [clientA, clientB]) {
                 selectWithOption(clientId).props.onChange({ target: { value: clientId } });
+                assertSelectionHeading();
                 assert.ok(selectWithOption(project.id), 'Shared project must be selectable through either client');
                 selectWithOption(project.id).props.onChange({ target: { value: project.id } });
                 const editor = render().find((element) => element.props.projectId === project.id);
@@ -168,6 +178,7 @@ export { reset, renderStart } from './hooks.js';
                 editorKey = editor.key;
             }
             selectWithOption('unassigned').props.onChange({ target: { value: 'unassigned' } });
+            assertSelectionHeading();
             assert.ok(selectWithOption('unassigned-project'));
             assert.equal(selectWithOption(project.id), undefined);
         }

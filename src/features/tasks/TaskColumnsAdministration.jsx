@@ -55,7 +55,16 @@ export default function TaskColumnsAdministration({ onEditingChange }) {
         </div>
         {mode === 'default' || project ? <TaskColumnsEditor key={`${mode}:${project?.id}:${discipline}`}
             projectId={mode === 'project' ? project.id : null} projectName={project?.name} discipline={discipline} onEditingChange={reportEditing} />
-            : <p className="hint">Select a client and project to view its task columns.</p>}
+            : <section className="presentation-management" aria-labelledby="task-columns-heading">
+                <header className="presentation-page-heading">
+                    <div>
+                        <p className="presentation-eyebrow">Administration · Project override</p>
+                        <h1 id="task-columns-heading">Task columns · {discipline}</h1>
+                        <p className="hint">Choose information shown in task lists and opened task details. This profile applies only inside this project.</p>
+                    </div>
+                </header>
+                <p className="hint">Select a client and project to view its task columns.</p>
+            </section>}
     </div>;
 }
 

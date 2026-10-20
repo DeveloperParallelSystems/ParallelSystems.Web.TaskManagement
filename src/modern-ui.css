@@ -252,14 +252,32 @@ a { text-underline-offset: 3px; }
 .task-columns-editor legend + * { clear: both; }
 .task-columns-editor { padding-top: 0; }
 
-/* Show the profile/discipline bar below the page heading without moving it in the DOM
+/* Show administration selectors below the page heading without moving them in the DOM
    (keeps the selects mounted so keyboard focus is never lost when switching profile). */
-.task-columns-admin { display: flex; flex-direction: column; }
-.task-columns-admin > .presentation-management { display: contents; }
-.task-columns-admin > .presentation-scope { order: 2; }
-.task-columns-admin > .presentation-management > * { order: 3; }
-.task-columns-admin > .presentation-management > .presentation-page-heading { order: 1; }
-.task-columns-admin > .hint { order: 3; }
+:is(.board-presentation-admin, .task-columns-admin) {
+    display: flex;
+    flex-direction: column;
+}
+
+:is(.board-presentation-admin, .task-columns-admin) > .presentation-management {
+    display: contents;
+}
+
+:is(.board-presentation-admin, .task-columns-admin) > .presentation-scope {
+    order: 2;
+}
+
+:is(.board-presentation-admin, .task-columns-admin) > .presentation-management > * {
+    order: 3;
+}
+
+:is(.board-presentation-admin, .task-columns-admin) > .presentation-management > .presentation-page-heading {
+    order: 1;
+}
+
+:is(.board-presentation-admin, .task-columns-admin) > .hint {
+    order: 3;
+}
 
 /* ---------- Cross-page consistency ---------- */
 /* Some feature stylesheets reference --border / --accent, which were never defined
