@@ -1,0 +1,303 @@
+/* Modern readability layer — loaded last. Colors/theme are unchanged; this only
+   refines type scale, spacing, radii, elevation, states and motion. */
+:root {
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --shadow-sm: 0 1px 2px #25342e0d, 0 1px 3px #25342e0a;
+    --shadow-md: 0 4px 12px #25342e12, 0 2px 4px #25342e08;
+    --shadow-lg: 0 16px 40px #25342e1f;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+    --muted: #66736b; /* same hue, slightly deeper for contrast */
+}
+
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; scroll-behavior: smooth; }
+body { font-size: 15px; line-height: 1.6; }
+h1, h2, h3 { letter-spacing: -.01em; line-height: 1.3; }
+p { max-width: 75ch; }
+::selection { background: #cfe0c4; }
+
+/* ---------- Shell ---------- */
+.app-shell { font-size: 15px; gap: 24px; padding: 20px; }
+.sidebar, .topbar, .panel, .table-wrap, .toolbar, .stat, .project-dialog {
+    box-shadow: var(--shadow-sm);
+}
+.sidebar { width: 256px; }
+.brand strong { font-size: 17px; letter-spacing: -.01em; }
+.brand small { font-size: 12px; }
+.nav-label { font-size: 12px; letter-spacing: .1em; font-weight: 700; }
+.sidebar nav a {
+    font-size: 14px; font-weight: 600; padding: 11px 14px; border-radius: 10px;
+    transition: background .18s var(--ease), color .18s var(--ease), transform .18s var(--ease);
+}
+.sidebar nav a:hover { transform: translateX(2px); }
+.sidebar nav a svg { flex-shrink: 0; }
+.sidebar-footer, .sidebar-footer span { font-size: 12px; }
+.topbar { backdrop-filter: saturate(1.2); }
+.breadcrumb { font-size: 14px; }
+.breadcrumb span { margin: 0 10px; }
+.account { font-size: 14px; }
+.account small { font-size: 12px; }
+.avatar { width: 38px; height: 38px; font-size: 13px; }
+.avatar.small { width: 28px; height: 28px; font-size: 11px; }
+.content { padding: 28px 0 48px; }
+
+/* ---------- Headings ---------- */
+.page-heading { margin-bottom: 28px; gap: 20px; }
+.page-heading h1 { font-size: 32px; line-height: 1.15; }
+.page-heading p, .muted, .page-note { font-size: 14px; color: var(--muted); line-height: 1.55; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: #5f6f5c; }
+.panel-heading h2, .section-heading h2 { font-size: 18px; font-weight: 700; }
+.panel, .table-wrap { padding: 28px; border-radius: var(--radius-lg); }
+.table-wrap { padding: 0; }
+
+/* ---------- Buttons ---------- */
+.button {
+    font-size: 14px; font-weight: 600; min-height: 42px; padding: 10px 18px;
+    border-radius: var(--radius-md);
+    transition: background .18s var(--ease), border-color .18s var(--ease),
+                box-shadow .18s var(--ease), transform .12s var(--ease);
+}
+.button:not(:disabled):not([aria-disabled="true"]):hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.button:not(:disabled):not([aria-disabled="true"]):active { transform: translateY(0); box-shadow: none; }
+.button.primary { box-shadow: 0 6px 16px #3d6b3033; }
+.icon-button { border-radius: var(--radius-sm); padding: 10px; transition: background .18s var(--ease); }
+.text-button { font-size: 13px; font-weight: 600; border-radius: 6px; }
+.text-button:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- Forms ---------- */
+input, select, textarea {
+    border-radius: 10px; padding: 11px 14px; font-size: 14px; line-height: 1.4;
+    transition: border-color .15s var(--ease), box-shadow .15s var(--ease), background .15s var(--ease);
+}
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: #b9c7b4; }
+input:focus, select:focus, textarea:focus {
+    outline: none; border-color: #5c9a4a; box-shadow: 0 0 0 4px #8dac7840;
+}
+input::placeholder, textarea::placeholder { color: #8a958d; }
+input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; padding: 0; }
+.field { gap: 8px; }
+.field > span { font-size: 13px; font-weight: 600; color: #45524a; }
+.field input, .field select, .field textarea { font-size: 14px; }
+.form-grid { gap: 20px; }
+.checkbox { font-size: 14px; gap: 10px; color: #45524a; }
+.hint { font-size: 13px; line-height: 1.55; padding: 12px 14px; border-radius: var(--radius-sm); color: #55684a; }
+.section-label { font-size: 13px; margin: 28px 0 16px; letter-spacing: .02em; }
+
+/* ---------- Toolbar / tabs / filters ---------- */
+.toolbar { padding: 14px 16px; border-radius: var(--radius-md); gap: 12px; }
+.toolbar select, .toolbar .search input { font-size: 14px; }
+.task-filter-controls > select, .toolbar .search, .task-filter-menu > summary { min-height: 44px; font-size: 14px; }
+.task-filter-menu > summary { transition: background .15s var(--ease), border-color .15s var(--ease); }
+.task-filter-menu > summary:hover { background: #f4f6f2; }
+.task-filter-menu .filter-popover { border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
+.toolbar .search:focus-within, .workspace-search:focus-within { border-color: #5c9a4a; box-shadow: 0 0 0 4px #8dac7833; }
+.workspace-search { width: 340px; transition: box-shadow .15s var(--ease), border-color .15s var(--ease); }
+.workspace-search input { font-size: 14px; }
+.view-tabs { padding: 4px; border-radius: var(--radius-md); }
+.view-tabs button { font-size: 14px; min-height: 36px; padding: 6px 14px; border-radius: 9px; transition: background .15s var(--ease), color .15s var(--ease); }
+.view-tabs button:hover:not(.active) { color: var(--green); }
+.results-bar { font-size: 13px; margin: 18px 2px 20px; }
+
+/* ---------- Stats ---------- */
+.stat { padding: 20px 22px; border-radius: var(--radius-lg); transition: box-shadow .2s var(--ease), transform .2s var(--ease); }
+.stat:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.stat > span { font-size: 14px; font-weight: 600; }
+.stat strong { font-size: 36px; margin: 8px 0 6px; font-variant-numeric: tabular-nums; }
+.stat small { font-size: 13px; color: var(--muted); }
+
+/* ---------- Board & cards ---------- */
+.board { gap: 20px; }
+.board-column { padding: 14px; border-radius: var(--radius-lg); }
+.column-heading h2, .column-heading h3 { font-size: 15px; }
+.column-heading > span { font-size: 13px; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+.card-stack { gap: 14px; }
+.task-card {
+    padding: 16px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+    transition: box-shadow .2s var(--ease), transform .2s var(--ease), border-color .2s var(--ease);
+}
+.task-card:hover, .task-card:focus-within { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.task-card h3 { font-size: 15px; line-height: 1.45; margin: 12px 0 8px; }
+.task-code { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.priority { font-size: 12px; font-weight: 600; }
+.project-name { font-size: 13px; margin-bottom: 12px; }
+.card-description { font-size: 13px; line-height: 1.55; }
+.discipline, .badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; line-height: 1.3; }
+.card-footer { padding-top: 14px; }
+.card-owner, .due { font-size: 12px; }
+.move-menu { font-size: 13px; min-height: 36px; }
+.column-empty { font-size: 13px; }
+
+/* ---------- Tables ---------- */
+table { font-size: 14px; }
+th, td { padding: 16px 20px; }
+th { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5f6c63; position: sticky; top: 0; }
+tbody tr { transition: background .12s var(--ease); }
+tbody tr:hover { background: #f7f9f5; }
+tbody tr:last-child td { border-bottom: 0; }
+.table-task { font-size: 14px; font-weight: 600; }
+.table-task small, .table-task span { font-size: 12px; color: var(--muted); }
+
+/* ---------- Empty states ---------- */
+.empty { padding: 72px 28px; }
+.empty h2 { font-size: 22px; }
+.empty p { font-size: 15px; }
+.empty-icon { width: 56px; height: 56px; border-radius: 16px; }
+
+/* ---------- Task page ---------- */
+.task-page-heading h1 { font-size: 30px; }
+.task-page-tabs { gap: 4px; }
+.task-page-tab { font-size: 14px; font-weight: 600; transition: background .15s var(--ease), color .15s var(--ease); }
+.task-page-columns { gap: 24px; }
+.task-page-columns h2 { font-size: 18px; }
+.task-page-footer { font-size: 14px; }
+.attachment-dropzone { border-radius: var(--radius-lg); transition: background .2s var(--ease), border-color .2s var(--ease); }
+.attachment-row { border-radius: var(--radius-md); }
+.comment-body { font-size: 14px; line-height: 1.65; }
+.comment-heading time { font-size: 12px; }
+.mention-picker { border-radius: var(--radius-md); box-shadow: var(--shadow-lg); }
+.activity { font-size: 13px; }
+.activity time, .activity small { font-size: 12px; }
+.checklist-item { padding-block: 6px; }
+progress { height: 8px; border-radius: 999px; }
+
+/* ---------- Dialogs ---------- */
+.project-dialog { border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); width: 520px; }
+.project-dialog[open] { animation: ui-pop .22s var(--ease); }
+.project-dialog::backdrop { backdrop-filter: blur(4px); }
+.drawer-head { padding: 24px 32px; }
+.drawer-head h2 { font-size: 22px; }
+.drawer-body { padding: 28px 32px; }
+.drawer-footer { padding: 18px 32px; }
+.project-dialog-help { font-size: 13px; }
+
+/* ---------- Calendar ---------- */
+.calendar-weekdays { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.calendar-day { border-radius: var(--radius-md); padding: 8px; }
+.calendar-day h3 { font-size: 13px; }
+.calendar-task { font-size: 12px; border-radius: 9px; transition: background .15s var(--ease), border-color .15s var(--ease); }
+
+/* ---------- Links ---------- */
+a { text-underline-offset: 3px; }
+
+/* ---------- Motion ---------- */
+.content > * { animation: ui-rise .35s var(--ease) both; }
+@keyframes ui-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ui-pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    .task-card:hover, .stat:hover, .button:hover { transform: none !important; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 760px) {
+    body, .app-shell { font-size: 15px; }
+    .app-shell { padding: 12px; gap: 14px; }
+    .page-heading h1 { font-size: 26px; }
+    .panel { padding: 20px; }
+    .drawer-head, .drawer-body, .drawer-footer { padding-inline: 20px; }
+    .workspace-search { width: 100%; }
+    th, td { padding: 12px 14px; }
+}
+
+/* ---------- Task columns page ---------- */
+/* Selectors become a compact context bar instead of two full-width fields. */
+.presentation-scope {
+    align-items: flex-end; gap: 20px; padding: 16px 20px; margin-bottom: 28px;
+    border-radius: var(--radius-md); background: #f4f6f2; box-shadow: none;
+}
+.presentation-scope label { flex: 0 1 300px; font-size: 13px; color: #45524a; }
+.presentation-scope select { background: #fff; }
+.presentation-management .presentation-scope { margin: 0 0 28px; }
+
+/* Heading: one-line description + rule callout */
+.presentation-page-heading { align-items: flex-start; margin-bottom: 28px; }
+.presentation-page-heading > div:first-child { max-width: 760px; }
+.presentation-page-heading h1 { font-size: 34px; margin-bottom: 12px; }
+.presentation-page-heading .hint { font-size: 15px; line-height: 1.6; color: var(--muted); }
+.presentation-page-heading .hint + .hint {
+    margin-top: 14px; padding: 12px 16px; font-size: 13px; line-height: 1.6;
+    background: #f1f5ec; border-left: 3px solid #8dac78; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: #55684a;
+}
+
+/* Save bar */
+.presentation-toolbar { padding: 16px 20px; border-radius: var(--radius-md); position: sticky; top: 12px; z-index: 3; box-shadow: var(--shadow-md); }
+.presentation-toolbar > span { font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; color: #45524a; }
+.presentation-toolbar > span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #5c9a4a; }
+.presentation-toolbar .button:disabled { opacity: 1; color: #8a958d; background: #f4f6f2; border-color: transparent; box-shadow: none; }
+.presentation-toolbar .button.primary:disabled { background: #cfdcc7; color: #fff; }
+
+/* Two-column editor: matching headings, roomier rows */
+.task-columns-layout { gap: 32px; }
+.task-columns-editor { border-radius: var(--radius-lg); padding: 8px 20px 12px; background: #fff; box-shadow: var(--shadow-sm); }
+.task-columns-editor legend, .task-columns-preview h2 {
+    font-size: 18px; font-weight: 700; color: #25342e; padding: 0 6px; margin: 0 0 12px;
+}
+.task-columns-editor legend { margin-bottom: 0; }
+.task-columns-preview h2 { padding: 0; }
+.task-column-option { gap: 10px; padding: 10px 0; border-bottom: 1px solid #edf1e9; }
+.task-column-option:last-child { border-bottom: 0; }
+.task-column-option .checkbox { font-size: 15px; font-weight: 500; }
+.task-column-option small { font-size: 12px; background: #edf1e9; border-radius: 999px; padding: 2px 8px; font-weight: 600; }
+.task-column-option .button { min-width: 40px; min-height: 40px; padding: 0; font-size: 16px; }
+
+/* Preview table: no awkward wrapping, clean horizontal scroll */
+.task-columns-preview .table-wrap { margin-bottom: 28px; }
+.task-columns-preview td, .task-columns-preview th { white-space: nowrap; }
+.task-columns-preview .table-task { min-width: 200px; display: block; }
+.task-columns-preview .table-task strong { display: block; font-size: 14px; }
+.task-columns-preview .badge { white-space: nowrap; }
+.task-columns-preview .hint { margin-bottom: 16px; }
+.task-columns-editor legend { float: left; width: 100%; padding: 12px 0 6px; margin: 0; }
+.task-columns-editor legend + * { clear: both; }
+.task-columns-editor { padding-top: 0; }
+
+/* Show the profile/discipline bar below the page heading without moving it in the DOM
+   (keeps the selects mounted so keyboard focus is never lost when switching profile). */
+.task-columns-admin { display: flex; flex-direction: column; }
+.task-columns-admin > .presentation-management { display: contents; }
+.task-columns-admin > .presentation-scope { order: 2; }
+.task-columns-admin > .presentation-management > * { order: 3; }
+.task-columns-admin > .presentation-management > .presentation-page-heading { order: 1; }
+.task-columns-admin > .hint { order: 3; }
+
+/* ---------- Cross-page consistency ---------- */
+/* Some feature stylesheets reference --border / --accent, which were never defined
+   (they fell back to a blue/indigo default). Map them onto the existing theme. */
+:root { --border: var(--line); --accent: var(--green); }
+
+/* One heading scale for every admin / management page */
+.presentation-page-heading h1, .label-management-heading h1, .workflow-page-heading h1 { font-size: 34px; line-height: 1.15; letter-spacing: -.02em; }
+.label-design h2, .label-library-heading h2, .workflow-section-heading h2, .status-catalog-heading h2,
+.task-detail-design .task-panel-heading h2, .task-detail-design .task-stage-overview-heading h2 { font-size: 18px; font-weight: 700; }
+.label-eyebrow, .workflow-eyebrow, .presentation-eyebrow { font-size: 12px; letter-spacing: .12em; }
+.label-design .hint, .workflow-page-heading .hint { font-size: 14px; line-height: 1.6; }
+
+/* Never break badges, dates, codes or buttons mid-label inside tables and cards */
+.badge, .due, .task-code, .discipline, .button, .status-catalog-usage, .label-definition-status { white-space: nowrap; }
+td .due, td .badge { display: inline-block; }
+
+/* Dense tables: same header + row treatment as the main tables */
+.label-definition-table th, .status-catalog-table thead th {
+    font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #5f6c63;
+}
+.label-definition-table td, .status-catalog-table td, .status-catalog-table tbody th { font-size: 14px; }
+.label-definition-table tbody tr:hover, .status-catalog-table tbody tr:hover { background: #f7f9f5; }
+.label-definition-table .button { min-height: 36px; }
+
+/* Segmented switches & filter pills share the view-tabs look and a 40px+ hit area */
+.workflow-discipline-switch button, .label-status-filters button { min-height: 40px; font-size: 14px; transition: background .15s var(--ease), color .15s var(--ease); }
+.workflow-discipline-switch button:hover:not([aria-pressed="true"]),
+.label-status-filters button:hover:not([aria-pressed="true"]) { color: var(--green); }
+
+/* Cards that act as links (clients, projects) */
+.client-card { border-radius: var(--radius-lg); transition: box-shadow .2s var(--ease), transform .2s var(--ease), border-color .2s var(--ease); }
+.client-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: #8dac78; }
+.client-card:focus-visible { outline: 3px solid #8dac78; }
+.project-clients-picker { border-radius: var(--radius-md); padding: 16px; }
+.project-clients-picker legend { font-size: 14px; }
+
+/* Workflow editor & stage cards */
+.discipline-stage, .discipline-action, .presentation-column, .workflow-map-stage { border-radius: var(--radius-md); }
+.discipline-workflows-management .discipline-active-version { border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.workflow-draft-badge { font-size: 12px; font-weight: 600; }

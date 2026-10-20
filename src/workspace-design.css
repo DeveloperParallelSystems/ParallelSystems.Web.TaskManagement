@@ -27,7 +27,7 @@
 }
 
 .nav-label {
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: .12em;
     margin: 0 10px 8px;
 }
@@ -159,7 +159,7 @@
 }
 
 .eyebrow {
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: .14em;
     color: #66736b;
 }
@@ -392,12 +392,12 @@
 }
 
 .task-code {
-    font-size: 11px;
+    font-size: 12px;
     color: #637268;
 }
 
 .priority {
-    font-size: 11px;
+    font-size: 12px;
 }
 
 .project-name {
@@ -425,7 +425,7 @@
 
 .discipline,
 .badge {
-    font-size: 11px;
+    font-size: 12px;
     border-radius: 6px;
     padding: 3px 8px;
 }
@@ -465,12 +465,12 @@
 }
 
 .card-owner {
-    font-size: 11px;
+    font-size: 12px;
     color: #66736b;
 }
 
 .due {
-    font-size: 11px;
+    font-size: 12px;
 }
 
 .move-menu {
@@ -648,7 +648,7 @@
     }
 
     .stat > span {
-        font-size: 10px;
+        font-size: 12px;
     }
 
     .stat strong {
@@ -742,7 +742,7 @@
 
     .mobile-stage-tabs small {
         display: block;
-        font-size: 10px;
+        font-size: 12px;
         margin-bottom: 5px;
         max-width: 220px;
         white-space: normal;
@@ -800,7 +800,7 @@
         padding: 5px 2px;
         color: #53634f;
         text-decoration: none;
-        font-size: 10px;
+        font-size: 12px;
         border-radius: 8px;
     }
 

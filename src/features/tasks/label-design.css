@@ -47,7 +47,7 @@
 .label-eyebrow {
     margin: 0;
     color: var(--label-muted);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -178,7 +178,7 @@
 .label-definition-table th {
     background: #fbfcfa;
     color: var(--label-muted);
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
@@ -203,7 +203,7 @@
 }
 
 .label-table-color {
-    font-size: 11px;
+    font-size: 12px;
 }
 
 .label-color-dot {

@@ -30,7 +30,7 @@ export default function TaskColumnsAdministration({ onEditingChange }) {
         }
     }
 
-    return <>
+    return <div className="task-columns-admin">
         <div className="presentation-scope" aria-label="Task column scope">
             <label>Profile<select value={mode} disabled={editing.saving} onChange={(event) => switchScope(() => setMode(event.target.value))}>
                 <option value="default">Shared defaults</option><option value="project">Project override</option>
@@ -56,7 +56,7 @@ export default function TaskColumnsAdministration({ onEditingChange }) {
         {mode === 'default' || project ? <TaskColumnsEditor key={`${mode}:${project?.id}:${discipline}`}
             projectId={mode === 'project' ? project.id : null} projectName={project?.name} discipline={discipline} onEditingChange={reportEditing} />
             : <p className="hint">Select a client and project to view its task columns.</p>}
-    </>;
+    </div>;
 }
 
 export function TaskColumnsEditor({ projectId = null, projectName = '', discipline, onEditingChange }) {
@@ -173,7 +173,7 @@ export function TaskColumnsEditor({ projectId = null, projectName = '', discipli
         {message && <p role="status">{message}</p>}
         {projectId && <ProjectCustomFieldsAdministration projectId={projectId} disabled={dirty || busy} onEditingChange={setDefinitionEditing} />}
         {!draft ? <p role="status">Task columns are unavailable or still loading.</p> : <>
-            <div className="presentation-toolbar"><span role="status">{busy ? 'Please wait…' : dirty ? 'Unsaved changes' : projectId && draft.usesDefault ? 'Using default' : 'Saved configuration'}</span>
+            <div className="presentation-toolbar"><span role="status">{busy ? 'Please wait…' : dirty ? 'Unsaved changes' : projectId && draft.usesDefault ? 'Using default' : 'No unsaved changes'}</span>
                 <div className="presentation-toolbar-actions">
                     {projectId && draft.usesDefault && !customizing && <button className="button" disabled={pending || definitionEditing.dirty || !canManage || stale} onClick={() => {
                         setCustomizing(true);

@@ -70,7 +70,7 @@
 
 .calendar-weekdays {
     color: #53634f;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 650;
     padding: 10px 0;
     text-align: center;
@@ -115,7 +115,7 @@
 
 .calendar-today-label {
     color: var(--green);
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .calendar-day ul,
@@ -141,7 +141,7 @@
     color: #25342e;
     text-align: left;
     overflow-wrap: anywhere;
-    font-size: 11px;
+    font-size: 12px;
 }
 
 .calendar-task:hover {
@@ -167,12 +167,12 @@
 .calendar-task-project,
 .calendar-task-owner {
     color: #53634f;
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .calendar-task .badge {
     white-space: normal;
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .planning-sections {
@@ -511,7 +511,7 @@ h1, h2, h3, p {
 .brand small {
     display: block;
     color: #6d7a71;
-    font-size: 11px;
+    font-size: 12px;
 }
 .sidebar-navigation {
     display: flex;
@@ -525,7 +525,7 @@ h1, h2, h3, p {
     color: #45524a;
 }
 .nav-label {
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 1.5px;
     color: #6d7a71;
@@ -544,7 +544,7 @@ h1, h2, h3, p {
     color: #45524a;
     border-radius: 0 8px 8px 0;
     border-left: 3px solid transparent;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 600;
     transition: background .12s ease, color .12s ease, border-color .12s ease;
 }
@@ -561,7 +561,7 @@ h1, h2, h3, p {
     border-top: 1px solid var(--line);
     letter-spacing: .03em;
     font-family: "Consolas", monospace;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     color: #45524a;
 }
@@ -610,7 +610,7 @@ h1, h2, h3, p {
 .account small {
     display: block;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 12px;
 }
 .avatar {
     width: 34px;
@@ -620,14 +620,14 @@ h1, h2, h3, p {
     color: var(--green);
     display: inline-grid;
     place-items: center;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     flex-shrink: 0;
 }
 .avatar.small {
     width: 25px;
     height: 25px;
-    font-size: 9px;
+    font-size: 12px;
 }
 .content {
     padding: 24px 0 32px;
@@ -643,7 +643,7 @@ h1, h2, h3, p {
 }
 .eyebrow {
     color: #7d8d7b;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 1.3px;
 }
@@ -722,7 +722,7 @@ h1 {
     border-top-color: #91af7b;
 }
 .stat > span {
-    font-size: 11px;
+    font-size: 12px;
     color: #68786b;
     font-weight: 600;
 }
@@ -736,7 +736,7 @@ h1 {
 }
 .stat small {
     color: #8a948a;
-    font-size: 10px;
+    font-size: 12px;
 }
 .toolbar {
     display: flex;
@@ -749,7 +749,7 @@ h1 {
     border-radius: 9px;
 }
 .toolbar select {
-    font-size: 11px;
+    font-size: 12px;
     padding: 10px 8px;
     max-width: 185px;
 }
@@ -779,7 +779,7 @@ h1 {
     background: transparent;
     padding: 7px 10px;
     color: #7b877b;
-    font-size: 11px;
+    font-size: 12px;
     display: flex;
     align-items: center;
     gap: 5px;
@@ -795,7 +795,7 @@ h1 {
     gap: 18px;
     align-items: center;
     color: #7d8a7d;
-    font-size: 11px;
+    font-size: 12px;
     margin: 14px 2px 18px;
 }
 .results-bar > span {
@@ -805,7 +805,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 7px;
-    font-size: 11px;
+    font-size: 12px;
     color: #6d7a71;
 }
 input[type="checkbox"] {
@@ -819,7 +819,7 @@ input[type="checkbox"] {
     background: transparent;
     color: var(--green);
     padding: 4px;
-    font-size: 11px;
+    font-size: 12px;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -903,7 +903,7 @@ input[type="checkbox"] {
     display: flex;
     align-items: center;
     gap: 7px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 650;
     margin: 0;
     color: #53634f;
@@ -929,7 +929,7 @@ input[type="checkbox"] {
     border-radius: 5px;
     padding: 1px 7px;
     color: #809074;
-    font-size: 10px;
+    font-size: 12px;
 }
 .card-stack {
     display: grid;
@@ -973,7 +973,7 @@ input[type="checkbox"] {
     margin-bottom: 10px;
 }
 .task-code {
-    font-size: 9px;
+    font-size: 12px;
     letter-spacing: .5px;
     color: #8b968b;
     font-weight: 600;
@@ -982,7 +982,7 @@ input[type="checkbox"] {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 9px;
+    font-size: 12px;
     color: #92917b;
 }
 .priority i {
@@ -1005,7 +1005,7 @@ input[type="checkbox"] {
 }
 .project-name {
     color: #8c968c;
-    font-size: 10px;
+    font-size: 12px;
     margin-bottom: 13px;
     overflow-wrap: anywhere;
 }
@@ -1017,7 +1017,7 @@ input[type="checkbox"] {
 }
 .discipline, .badge {
     display: inline-block;
-    font-size: 9px;
+    font-size: 12px;
     line-height: 1.5;
     border-radius: 4px;
     padding: 4px 6px;
@@ -1062,7 +1062,7 @@ input[type="checkbox"] {
     flex-wrap: wrap;
     gap: 12px;
     align-items: center;
-    font-size: 10px;
+    font-size: 12px;
 }
 .task-contributor {
     display: inline-flex;
@@ -1084,7 +1084,7 @@ input[type="checkbox"] {
     height: 28px;
     border-radius: 50%;
     background: #edf2f7;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
 }
 .qa .contributor-avatar {
@@ -1104,13 +1104,13 @@ input[type="checkbox"] {
     background: #294a69;
     color: #fff;
     box-shadow: 0 4px 14px #23320e20;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 400;
     text-align: left;
     overflow-wrap: anywhere;
 }
 .contributor-tooltip strong {
-    font-size: 10px;
+    font-size: 12px;
     color: #dbe7f1;
 }
 .contributor-tooltip::after {
@@ -1126,7 +1126,7 @@ input[type="checkbox"] {
 }
 .card-owner {
     margin-top: 7px;
-    font-size: 9px;
+    font-size: 12px;
     color: var(--muted);
     overflow-wrap: anywhere;
 }
@@ -1134,21 +1134,21 @@ input[type="checkbox"] {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 9px;
+    font-size: 12px;
     color: #788570;
 }
 .due {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 9px;
+    font-size: 12px;
     color: #8e9788;
 }
 .overdue {
     color: #b55751;
 }
 .column-empty {
-    font-size: 11px;
+    font-size: 12px;
     color: #95a08e;
     text-align: center;
     padding: 35px 5px;
@@ -1161,17 +1161,17 @@ input[type="checkbox"] {
     padding: 16px 19px;
     margin-top: 25px;
     color: #748369;
-    font-size: 11px;
+    font-size: 12px;
 }
 .workflow-note strong {
-    font-size: 11px;
+    font-size: 12px;
     color: #526a47;
 }
 .workflow-note p {
     margin: 7px 0;
 }
 .workflow-note small {
-    font-size: 10px;
+    font-size: 12px;
 }
 .panel, .table-wrap {
     background: #fff;
@@ -1194,7 +1194,7 @@ th, td {
     border-bottom: 1px solid #e9ede6;
 }
 th {
-    font-size: 10px;
+    font-size: 12px;
     color: #788473;
     font-weight: 600;
     background: #fafbf8;
@@ -1210,7 +1210,7 @@ th {
 }
 .table-task small, .table-task span {
     display: block;
-    font-size: 10px;
+    font-size: 12px;
     color: #89927e;
     margin: 3px 0;
 }
@@ -1480,7 +1480,7 @@ th {
     flex-shrink: 0;
     width: 32px;
     height: 32px;
-    font-size: 11px;
+    font-size: 12px;
 }
 .comment-composer-footer {
     display: flex;
@@ -1492,7 +1492,7 @@ th {
 }
 .comment-composer-footer > span {
     flex: 1 1 260px;
-    font-size: 11px;
+    font-size: 12px;
 }
 .comment-composer-footer > button {
     flex-shrink: 0;
@@ -1558,7 +1558,7 @@ th {
 }
 .comment-heading time {
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
 }
 .comment-body {
     white-space: pre-wrap;
@@ -1665,7 +1665,7 @@ th {
     min-width: 0;
 }
 .field > span {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 650;
     color: #76816c;
 }
@@ -1690,7 +1690,7 @@ th {
 .hint {
     background: #f1f5ec;
     color: #708263;
-    font-size: 11px;
+    font-size: 12px;
     border-radius: 6px;
     padding: 11px 13px;
     margin: 0;
@@ -1702,7 +1702,7 @@ th {
     border-left: 2px solid #e0e8d7;
     margin: 0 0 17px 3px;
     padding-left: 15px;
-    font-size: 11px;
+    font-size: 12px;
 }
 .activity-heading {
     display: flex;
@@ -1711,7 +1711,7 @@ th {
     gap: 6px;
 }
 .activity time, .activity small {
-    font-size: 10px;
+    font-size: 12px;
     color: #8b9484;
 }
 .activity p {
@@ -1831,7 +1831,7 @@ progress::-webkit-progress-value {
     gap: 6px;
     margin-bottom: 10px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
 }
 .project-contributors-heading > span {
@@ -1839,10 +1839,10 @@ progress::-webkit-progress-value {
     border-radius: 5px;
     background: #f1f3ef;
     color: var(--green);
-    font-size: 10px;
+    font-size: 12px;
 }
 .project-contributors .muted {
-    font-size: 11px;
+    font-size: 12px;
 }
 .project-card-top {
     display: flex;
@@ -1855,7 +1855,7 @@ progress::-webkit-progress-value {
     overflow-wrap: anywhere;
 }
 .project-card p {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     margin-bottom: 20px;
 }
@@ -1894,7 +1894,7 @@ progress::-webkit-progress-value {
     border: 1px solid var(--line);
     padding: 5px 10px;
     border-radius: 5px;
-    font-size: 10px;
+    font-size: 12px;
 }
 .login-page, .loading-screen {
     min-height: 100vh;
@@ -1928,7 +1928,7 @@ progress::-webkit-progress-value {
 .login-brand span {
     display: block;
     color: #89917c;
-    font-size: 11px;
+    font-size: 12px;
     margin-top: 2px;
 }
 .login-copy {
@@ -1983,12 +1983,12 @@ progress::-webkit-progress-value {
 }
 .login-footnote {
     text-align: center;
-    font-size: 10px;
+    font-size: 12px;
     color: #8a947e;
     margin: 21px 0 0;
 }
 .login-copyright {
-    font-size: 9px;
+    font-size: 12px;
     letter-spacing: 1.5px;
     color: #97a089;
     margin-top: 25px;
@@ -2024,7 +2024,7 @@ progress::-webkit-progress-value {
         gap: 4px;
     }
     .sidebar nav a {
-        font-size: 11px;
+        font-size: 12px;
         gap: 7px;
         padding: 10px;
         margin-bottom: 0;
@@ -2040,7 +2040,7 @@ progress::-webkit-progress-value {
         margin-top: 14px;
     }
     .breadcrumb {
-        font-size: 10px;
+        font-size: 12px;
     }
     .account .avatar, .account small {
         display: none;
@@ -2155,7 +2155,7 @@ progress::-webkit-progress-value {
 }
 .move-menu {
     width: 100%;
-    font-size: 11px;
+    font-size: 12px;
     padding: 7px 10px;
     background: #f8faf6;
 }
