@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
-import { Download, FileText, Paperclip, RefreshCw, Trash2, Upload, X } from 'lucide-react';
+import { Download, Eye, FileText, Paperclip, RefreshCw, Trash2, Upload, X } from 'lucide-react';
 import { request, uploadFile } from '../../app/api';
 import { invalidateTaskDetails } from '../../app/store';
 import { attachmentAccept, attachmentError, attachmentSize } from './attachmentValidation';
 import { createAttachmentUploadId } from './attachmentUploadId';
 import { loadTaskAttachments, removeTaskAttachment } from './attachmentState';
+import { attachmentPreviewType } from './attachmentPreview.js';
+import TaskAttachmentPreview from './TaskAttachmentPreview.jsx';
 
 export default function TaskAttachments({ taskId, onEditingChange, onHistoryChange }) {
     const dispatch = useDispatch();
@@ -19,6 +21,7 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
     const [removing, setRemoving] = useState(null);
     const [dragOver, setDragOver] = useState(false);
     const [downloading, setDownloading] = useState(null);
+    const [previewId, setPreviewId] = useState(null);
     const inputRef = useRef(null);
     const dialogRef = useRef(null);
     const controllers = useRef(new Set());
@@ -52,6 +55,12 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
             dispatch(loadTaskAttachments({ taskId }));
         }
     }, [attachments, dispatch, taskId]);
+
+    useEffect(() => {
+        if (previewId && (!attachments?.hasLoaded || !attachments.items.some((item) => item.id === previewId))) {
+            setPreviewId(null);
+        }
+    }, [attachments, previewId]);
 
     useEffect(() => {
         if (removing) {
@@ -201,6 +210,7 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
     }
 
     const pending = queue.filter((item) => ['queued', 'failed', 'cancelled'].includes(item.status));
+    const previewItem = attachments?.hasLoaded && attachments.items.find((item) => item.id === previewId);
     return (
         <section className="panel task-attachments" aria-labelledby="attachments-title" aria-busy={busy}>
             <div className="panel-heading attachment-heading">
@@ -267,6 +277,7 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
                 </div>
             )}
             <h3>Uploaded files</h3>
+            <p className="muted">Preview is available for PDFs and PNG/JPEG images.</p>
             {attachments?.status === 'loading' && <p role="status">Loading attachments…</p>}
             {attachments?.hasLoaded && !attachments.items.length && <p className="muted">No attachments yet.</p>}
             <ul className="attachment-list" aria-label="Uploaded attachments">
@@ -278,6 +289,8 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
                             <span className="muted">{attachmentSize(item.sizeBytes)} · {item.uploadedByName} · {new Date(item.createdAtUtc).toLocaleString()}</span>
                         </div>
                         <div className="attachment-actions">
+                            {attachmentPreviewType(item) && <button type="button" className="button" onClick={() => setPreviewId(item.id)}
+                                aria-label={`Preview ${item.fileName}`}><Eye size={15} aria-hidden="true" /> Preview</button>}
                             <button type="button" className="button" disabled={Boolean(downloading)} onClick={() => download(item)}
                                 aria-label={`Download ${item.fileName}`}><Download size={15} /> {downloading === item.id ? 'Downloading…' : 'Download'}</button>
                             {item.canDelete && <button type="button" className="icon-button" disabled={busy}
@@ -286,6 +299,9 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
                     </li>
                 ))}
             </ul>
+            {previewItem && <TaskAttachmentPreview key={`${taskId}:${previewItem.id}:${previewItem.version}:${userId}`}
+                taskId={taskId} attachment={previewItem} downloading={Boolean(downloading)}
+                onClose={() => setPreviewId(null)} onDownload={() => download(previewItem)} />}
             {removing && <dialog ref={dialogRef} className="project-dialog" aria-labelledby="remove-attachment-title"
                 aria-describedby="remove-attachment-description" onCancel={(event) => {
                     event.preventDefault();
