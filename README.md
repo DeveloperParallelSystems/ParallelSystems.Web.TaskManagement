@@ -119,7 +119,7 @@ The cookie `ParallelSystems.TaskManagement` uses the dedicated `TaskManagement` 
 
 ## EC2 deployment tools
 
-Use `DeploymentTools/Deploy-ParallelSystems-TaskManagement.cmd` to deploy this frontend at `/task-management/` alongside Timesheet (`/`) and Receipts (`/receipts/`) on the existing EC2 site. The default URL is `http://3.24.250.195/task-management/`; HTTPS/domain overrides are supported. The launcher requires a clean committed repository, asks for `YES`, runs tests/build, uploads compiled files, and installs a separate release with Nginx backups and rollback. Deploy the updated shared Server separately first. See [deployment instructions](DeploymentTools/README.md) for prerequisites, checks and recovery. These tools have been verified locally; no EC2 deployment has been performed.
+Use `DeploymentTools/Deploy-ParallelSystems-TaskManagement.cmd` to deploy this frontend at `/task-management/` alongside Timesheet (`/`) and Receipts (`/receipts/`) on the existing EC2 site. The default URL is `https://app.parallelsystems.com.au/task-management/`; custom origins are supported. SSH still uses the configured EC2 IP address. The launcher requires a clean committed repository, asks for `YES`, runs tests/build, uploads compiled files, and installs a separate release with Nginx backups and rollback. Deploy the updated shared Server separately first. See [deployment instructions](DeploymentTools/README.md) for prerequisites, checks and recovery. Read-only EC2 checks verified the domain routes on 2026-10-25; no EC2 deployment was performed during this correction.
 
 ## Current boundaries
 

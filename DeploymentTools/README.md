@@ -1,9 +1,10 @@
 # Task Management website deployment
 
-Default deployment URL: **http://3.24.250.195/task-management/**.
-The same app can be served at **http://app.parallelsystems.com.au/task-management/**
-through the existing Timesheet Nginx site. These defaults match the local
-Timesheet and Receipts tools; the current EC2 configuration has not been inspected.
+Default deployment URL: **https://app.parallelsystems.com.au/task-management/**.
+The SSH upload target remains `ubuntu@3.24.250.195`; the public site uses the domain.
+Read-only EC2 checks on 2026-10-25 confirmed that this HTTPS origin serves all three
+apps and API health. Requests using the old HTTP IP origin returned 404 before
+release activation because it does not select the configured domain site.
 
 Timesheet stays at `/`, Receipts at `/receipts/`, and the shared API at `/api`.
 Task Management uses `/api/task-management` and its separate login cookie.
@@ -46,8 +47,8 @@ For overrides, run from this folder:
 
 ```powershell
 .\Deploy-ParallelSystems-TaskManagement.ps1 -SiteUrl https://app.parallelsystems.com.au
-# If that origin still selects the existing IP-named Nginx site:
-.\Deploy-ParallelSystems-TaskManagement.ps1 -SiteUrl https://app.parallelsystems.com.au -NginxHost 3.24.250.195
+# For a custom origin that selects the existing domain-named Nginx site:
+.\Deploy-ParallelSystems-TaskManagement.ps1 -SiteUrl https://YOUR_SITE_HOST -NginxHost app.parallelsystems.com.au
 # Optional: -Server ubuntu@YOUR_EC2_HOST -KeyPath C:\path\to\key.pem
 ```
 
@@ -105,6 +106,8 @@ changes during this operation. Backups restore the affected site file as a whole
 
 Before activation, the helper compares the Timesheet route to its active index,
 does the same for an existing Receipts release, and checks `/health`.
+Failed preflight HTTP requests identify the app, checked URL and Host header,
+and explicitly report that no release was activated.
 An unauthenticated `GET /api/task-management/auth/me` must return 401, not a redirect,
 404, or SPA fallback. This uses no employee credentials and performs no account/task writes.
 

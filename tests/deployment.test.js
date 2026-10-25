@@ -39,6 +39,8 @@ test('declining deployment exits before building or uploading', { skip: !windows
     const result = runLauncher();
     assert.equal(result.status, 0, result.error?.message || result.stdout || result.stderr);
     assert.match(result.stdout, /Cancelled\. Nothing was built, uploaded, or deployed\./);
+    assert.match(result.stdout, /Deployment\/check URL: https:\/\/app\.parallelsystems\.com\.au\/task-management\//);
+    assert.match(result.stdout, /Nginx hostname: app\.parallelsystems\.com\.au/);
     assert.doesNotMatch(result.stdout, /\[1\/5\]/);
 });
 

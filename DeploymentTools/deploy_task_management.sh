@@ -81,7 +81,11 @@ test -f "$snippet"
 printf '%s  %s\n' "$archive_hash" "$archive" | sha256sum --check --status
 nginx -t
 
-timesheet_before=$(site_curl --fail --silent --show-error --location --max-time 30 "$origin/" | sha256sum | cut -d ' ' -f1)
+if ! timesheet_before=$(site_curl --fail --silent --show-error --location --max-time 30 "$origin/" | sha256sum | cut -d ' ' -f1); then
+    echo "Timesheet preflight failed at $origin/ (Host: $site_host). No release was activated." >&2
+    echo 'Check SiteUrl and NginxHost. The default production origin is https://app.parallelsystems.com.au.' >&2
+    exit 1
+fi
 test -f /var/www/parallel-systems-timesheet/current/index.html
 timesheet_file=$(sha256sum /var/www/parallel-systems-timesheet/current/index.html | cut -d ' ' -f1)
 if [ "$timesheet_before" != "$timesheet_file" ]; then
@@ -91,14 +95,20 @@ fi
 receipts_current=/var/www/parallel-systems-receipts/current
 if [ -e "$receipts_current" ] || [ -L "$receipts_current" ]; then
     test -f "$receipts_current/receipts/index.html"
-    receipts_before=$(site_curl --fail --silent --show-error --location --max-time 30 "$origin/receipts/" | sha256sum | cut -d ' ' -f1)
+    if ! receipts_before=$(site_curl --fail --silent --show-error --location --max-time 30 "$origin/receipts/" | sha256sum | cut -d ' ' -f1); then
+        echo "Receipts preflight failed at $origin/receipts/ (Host: $site_host). No release was activated." >&2
+        exit 1
+    fi
     receipts_file=$(sha256sum "$receipts_current/receipts/index.html" | cut -d ' ' -f1)
     if [ "$receipts_before" != "$receipts_file" ]; then
         echo 'Existing Receipts route is not serving its active release; no activation performed.' >&2
         exit 1
     fi
 fi
-site_curl --fail --silent --show-error --location --max-time 30 "$origin/health" >/dev/null
+if ! site_curl --fail --silent --show-error --location --max-time 30 "$origin/health" >/dev/null; then
+    echo "Shared API health preflight failed at $origin/health (Host: $site_host). No release was activated." >&2
+    exit 1
+fi
 check_task_api
 if [ -L "$current" ]; then
     previous=$(realpath -e "$current")

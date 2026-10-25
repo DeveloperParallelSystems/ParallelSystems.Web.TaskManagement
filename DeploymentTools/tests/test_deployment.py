@@ -24,6 +24,75 @@ def run_bash(source, arguments, directory):
     )
 
 
+class PreflightChecks(unittest.TestCase):
+    def test_failed_routes_identify_the_url_before_activation(self):
+        source = (Path(__file__).parents[1] / 'deploy_task_management.sh').read_text()
+        preflight = source[source.index('if ! timesheet_before='):source.index('\nif [ -L "$current" ]')]
+        preflight = preflight.replace('/var/www/parallel-systems-receipts/current', 'receipts-current')
+        harness = '''
+set -Eeuo pipefail
+origin=https://app.parallelsystems.com.au
+site_host=app.parallelsystems.com.au
+failed_path=$1
+site_curl() {
+    local url="${@: -1}"
+    if [ "$url" = "$origin$failed_path" ]; then
+        echo 'curl: (22) The requested URL returned error: 404' >&2
+        return 22
+    fi
+    printf 'page\n'
+}
+test() {
+    return 0
+}
+sha256sum() {
+    if [ "$#" -eq 0 ]; then
+        cat >/dev/null
+    fi
+    printf 'expected-hash  file\n'
+}
+'''
+        for path, label in [('/', 'Timesheet'), ('/receipts/', 'Receipts'), ('/health', 'Shared API health')]:
+            with self.subTest(path=path), temporary_fixture('task-preflight-') as folder:
+                (Path(folder) / 'receipts-current').mkdir()
+                result = run_bash(harness + preflight, [path], folder)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(label + ' preflight failed', result.stderr)
+                self.assertIn('https://app.parallelsystems.com.au' + path, result.stderr)
+                self.assertIn('No release was activated.', result.stderr)
+
+    def test_passing_preflight_preserves_hashes(self):
+        source = (Path(__file__).parents[1] / 'deploy_task_management.sh').read_text()
+        preflight = source[source.index('if ! timesheet_before='):source.index('\nif [ -L "$current" ]')]
+        preflight = preflight.replace('/var/www/parallel-systems-receipts/current', 'receipts-current')
+        harness = '''
+set -Eeuo pipefail
+origin=https://app.parallelsystems.com.au
+site_host=app.parallelsystems.com.au
+site_curl() {
+    printf 'page\n'
+}
+test() {
+    return 0
+}
+sha256sum() {
+    if [ "$#" -eq 0 ]; then
+        cat >/dev/null
+    fi
+    printf 'expected-hash  file\n'
+}
+check_task_api() {
+    printf 'Task API checked.\n'
+}
+'''
+        with temporary_fixture('task-preflight-') as folder:
+            (Path(folder) / 'receipts-current').mkdir()
+            result = run_bash(harness + preflight + '\nprintf "%s|%s\\n" "$timesheet_before" "$receipts_before"\n', [], folder)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('expected-hash|expected-hash', result.stdout)
+            self.assertIn('Task API checked.', result.stdout)
+
+
 class SessionProbeChecks(unittest.TestCase):
     def test_only_unauthenticated_401_is_accepted(self):
         source = (Path(__file__).parents[1] / 'deploy_task_management.sh').read_text()

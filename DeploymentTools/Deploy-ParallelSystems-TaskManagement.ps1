@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string] $SiteUrl = 'http://3.24.250.195',
+    [string] $SiteUrl = 'https://app.parallelsystems.com.au',
     [string] $NginxHost = '',
     [string] $Server = 'ubuntu@3.24.250.195',
     [string] $KeyPath = 'C:\Projects\ParallelSystems\Deployment\ps-prod-app-key.pem',
