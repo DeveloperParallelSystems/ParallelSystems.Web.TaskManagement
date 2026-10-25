@@ -7,7 +7,7 @@ import { attachmentAccept, attachmentError, attachmentSize } from './attachmentV
 import { createAttachmentUploadId } from './attachmentUploadId';
 import { loadTaskAttachments, removeTaskAttachment } from './attachmentState';
 
-export default function TaskAttachments({ taskId, active, onEditingChange, onHistoryChange }) {
+export default function TaskAttachments({ taskId, onEditingChange, onHistoryChange }) {
     const dispatch = useDispatch();
     const reduxStore = useStore();
     const userId = useSelector((state) => state.auth.user?.userId);
@@ -48,10 +48,10 @@ export default function TaskAttachments({ taskId, active, onEditingChange, onHis
     }, [dirty, busy, onEditingChange]);
 
     useEffect(() => {
-        if (active && !attachments) {
+        if (!attachments) {
             dispatch(loadTaskAttachments({ taskId }));
         }
-    }, [active, attachments, dispatch, taskId]);
+    }, [attachments, dispatch, taskId]);
 
     useEffect(() => {
         if (removing) {

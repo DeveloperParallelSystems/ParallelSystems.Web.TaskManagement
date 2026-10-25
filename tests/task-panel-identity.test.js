@@ -102,7 +102,8 @@ export function useNavigate() {
             reset({ id, version, title: 'Test task', status: 'To Do', labels: [], history: [] });
             const tree = TaskPage({ id, onEditingChange: () => {}, onClose: () => {}, onSaved: () => {} });
             const details = tree.props.children.find((child) => child?.props?.id === 'task-details-panel');
-            return descendants(details).filter((child) => typeof child.type === 'function' &&
+            const meta = descendants(tree).find((child) => child.props.className === 'task-detail-meta');
+            return [...descendants(meta), ...descendants(details)].filter((child) => typeof child.type === 'function' &&
                 child.key !== null && (child.props.taskId || child.props.task));
         }
         const initial = panels('task-one', 1);
@@ -118,6 +119,9 @@ export function useNavigate() {
         reset(task);
         const simpleTree = TaskPage({ id: task.id, onEditingChange: () => {}, onClose: () => {}, onSaved: () => {} });
         const controls = descendants(simpleTree);
+        const labels = controls.find((child) => child.type?.name === 'TaskLabels');
+        assert.equal(labels.props.compact, true, 'Labels must use the compact header picker.');
+        assert.equal(labels.props.integrated, true, 'Label drafts must still use the unified task save.');
         const control = controls.find((child) => child.type === 'select' && child.props['aria-label'] === 'Status');
         assert.ok(control, 'Status must be part of the unified task form.');
         assert.equal(control.props.value, task.status);

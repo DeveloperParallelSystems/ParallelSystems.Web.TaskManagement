@@ -491,18 +491,23 @@ h1, h2, h3, p {
     align-items: center;
     gap: 11px;
     /* Include the panel's top border in the shared header height. */
-    height: calc(var(--shell-header-height) - 1px);
+    min-height: calc(var(--shell-header-height) - 1px);
     flex-shrink: 0;
-    padding: 0 20px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--line);
 }
 .brand img, .login-brand img {
-    width: 42px;
-    height: 42px;
+    display: block;
+    width: 100%;
+    height: auto;
     object-fit: contain;
-    background: #fff;
-    border-radius: 10px;
-    padding: 4px;
+}
+.brand img {
+    min-width: 0;
+    max-width: 216px;
+}
+.login-brand img {
+    max-width: 260px;
 }
 .brand strong {
     font-size: 15px;
@@ -1289,6 +1294,11 @@ th {
     color: var(--muted);
     font-weight: 600;
 }
+.task-tab-count {
+    margin-left: 6px;
+    min-width: 1ch;
+    font-variant-numeric: tabular-nums;
+}
 .task-page-tab:hover {
     color: var(--green);
     background: #eaf1e5;
@@ -1916,8 +1926,9 @@ progress::-webkit-progress-value {
 }
 .login-brand {
     display: flex;
-    gap: 12px;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
     padding-bottom: 22px;
     border-bottom: 1px solid var(--line);
 }

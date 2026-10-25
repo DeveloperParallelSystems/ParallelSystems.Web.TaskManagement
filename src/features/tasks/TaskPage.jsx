@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import TaskFollowButton from './TaskFollowButton.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBlocker, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Clock3, RotateCcw, Link, FileText, Settings2, CheckSquare } from 'lucide-react';
+import { ArrowLeft, Save, Clock3, RotateCcw, Link, FileText, Settings2, CheckSquare, Plus } from 'lucide-react';
 import { request } from '../../app/api';
 import { saveTask } from '../../app/store';
 import { disciplines, staffOptionLabel } from './workflow';
@@ -48,6 +48,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
     const { people, projects, clients = [], tasks = [] } = useSelector((state) => state.workspace);
     const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
     const statusSettingsError = useSelector((state) => state.workspace.statusSettings?.error);
+    const attachments = useSelector((state) => state.workspace.attachments?.[id]);
     const administrator = useSelector((state) => state.auth.user.role === 'Administrator');
     const headingRef = useRef(null);
     const confirmRef = useRef(null);
@@ -491,7 +492,19 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                             <span className={`task-detail-priority priority-${details.task.priority?.toLowerCase()}`}>
                                 {details.task.priority} priority
                             </span>
+                            {!loading && <TaskLabels key={`labels-${id}`} task={details.task} integrated compact
+                                disabled={saving || linkedTicketEditing.dirty || linkedTicketEditing.saving}
+                                onEditingChange={setLabelEditing} onFailure={setError}
+                                onSaved={(result, expectedVersion) => {
+                                    setDetails((current) => current ? { ...current, task: { ...current.task, ...result } } : current);
+                                    setValues((current) => current.version === expectedVersion ? { ...current, ...result } : current);
+                                    refreshHistory();
+                                }} />}
                         </>}
+                        {id === 'new' && <button type="button" className="task-label-add" disabled
+                            aria-label="Save this task to assign labels" title="Save this task to assign labels">
+                            <Plus size={16} aria-hidden="true" />
+                        </button>}
                     </div>
                     <h1 id="task-page-title" ref={headingRef} tabIndex={-1}>
                         {id === 'new' ? 'Create task' : details?.task.title || 'Task details'}
@@ -515,7 +528,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
             <div className="task-detail-toolbar">
                 <p className="task-page-subtitle">Create and organize a task with all the necessary details.</p>
                 <div className="task-detail-tabs">
-                    <TaskPageTabs value={activeTab} onChange={setActiveTab} attachmentsDisabled={id === 'new'} />
+                    <TaskPageTabs value={activeTab} onChange={setActiveTab} attachmentsDisabled={id === 'new'}
+                        attachmentCount={attachments?.hasLoaded ? attachments.items.length : undefined} />
                 </div>
             </div>
             <div id="task-details-panel" className="task-tab-panel" role="tabpanel"
@@ -675,16 +689,6 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                             </form>
                         )}
                         {linkedTicketEditing.dirty && <p className="hint">Link or cancel the ticket selection before saving task details or labels.</p>}
-                        {id === 'new' && <section className="panel task-label-panel"><h2>Labels</h2>
-                            <p className="muted">Save this task to assign labels.</p></section>}
-                        {!loading && details && <TaskLabels key={`labels-${id}`} task={details.task} integrated
-                            disabled={saving || linkedTicketEditing.dirty || linkedTicketEditing.saving}
-                            onEditingChange={setLabelEditing} onFailure={setError}
-                            onSaved={(result, expectedVersion) => {
-                                setDetails((current) => current ? { ...current, task: { ...current.task, ...result } } : current);
-                                setValues((current) => current.version === expectedVersion ? { ...current, ...result } : current);
-                                refreshHistory();
-                            }} />}
                         {id !== 'new' && <TaskDiscussion taskId={id} onEditingChange={setDiscussionEditing} />}
                     </div>
                     <aside className="task-detail-side" aria-label="Task planning">
@@ -771,7 +775,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                 aria-labelledby="task-attachments-tab" tabIndex={0} hidden={activeTab !== 'attachments'}>
                 {id !== 'new' && <TaskAttachments
                     key={JSON.stringify(people.map((person) => [person.id, person.userId, person.accountIsActive]))}
-                    taskId={id} active={activeTab === 'attachments'} onEditingChange={setAttachmentEditing}
+                    taskId={id} onEditingChange={setAttachmentEditing}
                     onHistoryChange={refreshHistory} />}
             </div>
             {blocker.state === 'blocked' && (

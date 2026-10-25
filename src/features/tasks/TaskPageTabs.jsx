@@ -7,7 +7,7 @@ const tabs = [
     { key: 'attachments', label: 'Attachments', icon: Paperclip },
 ];
 
-export default function TaskPageTabs({ value, onChange, attachmentsDisabled = false }) {
+export default function TaskPageTabs({ value, onChange, attachmentsDisabled = false, attachmentCount }) {
     const buttons = useRef([]);
     const [focused, setFocused] = useState(value);
     const [tooltip, setTooltip] = useState(null);
@@ -48,6 +48,8 @@ export default function TaskPageTabs({ value, onChange, attachmentsDisabled = fa
                 const Icon = tab.icon;
                 const visible = tooltip === tab.key;
                 const disabled = tab.key === 'attachments' && attachmentsDisabled;
+                const showCount = tab.key === 'attachments' && !disabled && attachmentCount !== undefined;
+                const label = showCount ? `${tab.label} (${attachmentCount})` : tab.label;
                 return (
                     <button
                         key={tab.key}
@@ -58,7 +60,7 @@ export default function TaskPageTabs({ value, onChange, attachmentsDisabled = fa
                         role="tab"
                         id={`task-${tab.key}-tab`}
                         className="task-page-tab"
-                        aria-label={tab.label}
+                        aria-label={label}
                         aria-selected={value === tab.key}
                         aria-disabled={disabled || undefined}
                         aria-controls={disabled ? undefined : `task-${tab.key}-panel`}
@@ -83,9 +85,10 @@ export default function TaskPageTabs({ value, onChange, attachmentsDisabled = fa
                         onKeyDown={(event) => keyDown(event, index)}
                     >
                         {Icon ? <Icon size={19} aria-hidden="true" /> : tab.label}
+                        {showCount && <span className="task-tab-count" aria-hidden="true">{attachmentCount}</span>}
                         {visible && (
                             <span id={`task-${tab.key}-tooltip`} role="tooltip" className="task-tab-tooltip">
-                                {disabled ? 'Save this task to add attachments' : tab.label}
+                                {disabled ? 'Save this task to add attachments' : label}
                             </span>
                         )}
                     </button>

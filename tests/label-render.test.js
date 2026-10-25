@@ -39,6 +39,11 @@ test('label rendering escapes names, retains inactive labels and restricts assig
         const integrated = render('Administrator', TaskLabels, { ...props, integrated: true });
         assert.doesNotMatch(integrated, /Save labels|Save labels separately/);
         assert.match(integrated, /Changes are included when you Save the task/);
+        const compact = render('Administrator', TaskLabels, { ...props, integrated: true, compact: true });
+        assert.match(compact, /<summary[^>]*aria-label="Select labels"/);
+        assert.match(compact, /role="dialog"/);
+        assert.doesNotMatch(compact, /<details[^>]* open|task-label-panel|Save labels/);
+        assert.match(compact, /class="task-label"/);
         const missingDefinition = render('Administrator', TaskLabels, props, [task], []);
         assert.match(missingDefinition, /aria-label="Remove &lt;script&gt;alert\(1\)&lt;\/script&gt;"/);
         assert.match(missingDefinition, /type="checkbox" checked=""/);
@@ -57,6 +62,9 @@ test('label rendering escapes names, retains inactive labels and restricts assig
         const member = render('User', TaskLabels, props);
         assert.doesNotMatch(member, /Save labels|type="checkbox"/);
         assert.match(member, /&lt;script&gt;/);
+        const compactMember = render('User', TaskLabels, { ...props, integrated: true, compact: true });
+        assert.doesNotMatch(compactMember, /<summary|role="dialog"|type="checkbox"/);
+        assert.match(compactMember, /class="task-label"/);
         assert.equal(render('User', TaskLabels, props, []), '');
         assert.equal(labelStyle('#ffffff').color, '#000000');
         assert.equal(labelStyle('#000000').color, '#ffffff');

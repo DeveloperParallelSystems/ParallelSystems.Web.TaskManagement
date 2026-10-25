@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Search, X } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { assignTaskLabels, labelOptions } from './labelState.js';
 import LabelBadges, { labelStyle } from './LabelBadges';
 import './label-design.css';
@@ -21,7 +21,7 @@ export function LabelPickerChoices({ options, selected, query, onToggle }) {
     </div>;
 }
 
-export default function TaskLabels({ task, disabled, onEditingChange, onSaved, onFailure, integrated = false }) {
+export default function TaskLabels({ task, disabled, onEditingChange, onSaved, onFailure, integrated = false, compact = false }) {
     const dispatch = useDispatch();
     const { labels = [], tasks } = useSelector((state) => state.workspace);
     const administrator = useSelector((state) => state.auth.user?.role === 'Administrator');
@@ -30,6 +30,8 @@ export default function TaskLabels({ task, disabled, onEditingChange, onSaved, o
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
     const [query, setQuery] = useState('');
+    const pickerRef = useRef(null);
+    const headingId = useId();
     const visible = tasks.some((item) => item.id === task.id);
     const definitions = new Map(labels.map((label) => [label.id, label]));
     for (const assigned of task.labels || []) {
@@ -40,6 +42,25 @@ export default function TaskLabels({ task, disabled, onEditingChange, onSaved, o
     }
     const options = labelOptions([...definitions.values()], task.labels, selected);
     const selectedLabels = options.filter((label) => selected.includes(label.id));
+
+    function closePicker() {
+        pickerRef.current.open = false;
+        pickerRef.current.querySelector('summary').focus();
+    }
+
+    useEffect(() => {
+        if (!compact) {
+            return;
+        }
+        function dismiss(event) {
+            const picker = pickerRef.current;
+            if (picker?.open && !picker.contains(event.target)) {
+                picker.open = false;
+            }
+        }
+        document.addEventListener('pointerdown', dismiss);
+        return () => document.removeEventListener('pointerdown', dismiss);
+    }, [compact]);
 
     function toggleLabel(id, checked) {
         setSelected((current) => checked ? [...current, id] : current.filter((selectedId) => selectedId !== id));
@@ -80,11 +101,8 @@ export default function TaskLabels({ task, disabled, onEditingChange, onSaved, o
     if (!visible) {
         return null;
     }
-    return <section className="panel task-label-panel label-design" aria-labelledby="task-label-heading">
-        <h2 id="task-label-heading">Labels</h2>
-        {!administrator && <LabelBadges labels={task.labels} />}
-        {!task.labels?.length && !dirty && <p className="muted">No labels assigned.</p>}
-        {administrator && <form onSubmit={integrated ? (event) => event.preventDefault() : save}>
+    const editor = administrator && (
+        <form onSubmit={integrated ? (event) => event.preventDefault() : save}>
             <p className="hint">{integrated ? 'Select up to 20 labels. Changes are included when you Save the task.' : 'Select up to 20 labels. Save labels separately from task details.'}</p>
             {error && <p className="error" role="alert">{error.message}</p>}
             <fieldset className="label-options" disabled={saving || disabled}>
@@ -109,6 +127,53 @@ export default function TaskLabels({ task, disabled, onEditingChange, onSaved, o
                     setError(null);
                 }}>Cancel label changes</button>
             </div>
-        </form>}
+        </form>
+    );
+
+    if (compact) {
+        return <div className="task-label-compact label-design">
+            {administrator && <details ref={pickerRef} className="task-label-picker"
+                onToggle={(event) => {
+                    if (event.currentTarget.open) {
+                        event.currentTarget.querySelector('input[type="search"]')?.focus();
+                    }
+                }}
+                onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                        event.currentTarget.open = false;
+                    }
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Escape' && pickerRef.current.open) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        closePicker();
+                    }
+                }}>
+                <summary className="task-label-add" aria-label="Select labels" title="Select labels"
+                    aria-disabled={disabled || undefined} onClick={(event) => {
+                        if (disabled) {
+                            event.preventDefault();
+                        }
+                    }}><Plus size={16} aria-hidden="true" /></summary>
+                <section className="task-label-popover" role="dialog" aria-labelledby={headingId}>
+                    <div className="task-label-popover-heading">
+                        <h2 id={headingId}>Labels</h2>
+                        <button type="button" className="text-button" aria-label="Close label picker" onClick={closePicker}>
+                            <X size={16} aria-hidden="true" />
+                        </button>
+                    </div>
+                    {editor}
+                </section>
+            </details>}
+            <LabelBadges labels={selectedLabels} />
+        </div>;
+    }
+
+    return <section className="panel task-label-panel label-design" aria-labelledby="task-label-heading">
+        <h2 id="task-label-heading">Labels</h2>
+        {!administrator && <LabelBadges labels={task.labels} />}
+        {!task.labels?.length && !dirty && <p className="muted">No labels assigned.</p>}
+        {editor}
     </section>;
 }

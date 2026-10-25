@@ -34,10 +34,83 @@
 }
 
 .task-detail-design .task-detail-meta {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 10px;
+}
+
+.task-label-compact {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+
+.task-label-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--detail-border);
+    border-radius: 50%;
+    color: var(--detail-accent);
+    background: #fff;
+    cursor: pointer;
+    list-style: none;
+}
+
+.task-label-add::-webkit-details-marker {
+    display: none;
+}
+
+.task-label-add:hover {
+    background: var(--detail-soft);
+}
+
+.task-label-add:focus-visible {
+    outline: 2px solid var(--detail-accent);
+    outline-offset: 2px;
+}
+
+.task-label-add:disabled,
+.task-label-add[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.task-label-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    width: min(380px, calc(100vw - 64px));
+    max-height: 65vh;
+    overflow-y: auto;
+    padding: 16px;
+    border: 1px solid var(--detail-border);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 12px 32px rgb(37 52 46 / 16%);
+}
+
+.task-label-popover-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.task-label-popover-heading h2 {
+    font-size: 15px;
+}
+
+.task-label-popover .label-picker-menu {
+    box-shadow: none;
 }
 
 .task-detail-design .task-detail-meta .eyebrow {

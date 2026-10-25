@@ -230,11 +230,7 @@ export default function App() {
         <div className="app-shell">
             <aside className="sidebar">
                 <div className="brand">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" />
-                    <div>
-                        <strong>Parallel Systems</strong>
-                        <small>Workspace</small>
-                    </div>
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Parallel Systems — Devised to deliver" />
                     <button type="button" className="icon-button mobile-menu-toggle" aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
                         aria-expanded={mobileMenuOpen} aria-controls="workspace-navigation" onClick={() => setMobileMenuOpen((open) => !open)}>
                         {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}

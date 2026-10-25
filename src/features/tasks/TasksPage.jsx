@@ -298,7 +298,7 @@ export default function TasksPage({ onOpen, projectScope = null }) {
                     <select aria-label="Sort tasks by" value={filters.sort} onChange={(event) => updateQuery({ sort: event.target.value })}>
                         {sortOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
-                    <details className="task-filter-menu">
+                    <details className="task-filter-menu" name="task-filters">
                         <summary><SlidersHorizontal size={15} />More filters{filters.status || filters.quickView ? ' · active' : ''}</summary>
                         <div className="filter-popover">
                             <label className="field"><span>Status</span>
@@ -324,20 +324,30 @@ export default function TasksPage({ onOpen, projectScope = null }) {
                             </label>
                         </div>
                     </details>
-                    <details className="task-filter-menu label-filter-menu">
+                    <details className="task-filter-menu label-filter-menu" name="task-filters">
                         <summary><Tags size={15} />Labels{filters.labelIds.length > 0 ? ` · ${filters.labelIds.length}` : ''}</summary>
-                        <fieldset className="label-filter filter-popover">
-                            <legend>Labels · matches all selected</legend>
-                            {labels.map((label) => <label className="checkbox" key={label.id}>
-                                <input type="checkbox" checked={filters.labelIds.includes(label.id)} onChange={(event) => {
-                                    updateQuery({ labelIds: event.target.checked ? [...filters.labelIds, label.id] : filters.labelIds.filter((id) => id !== label.id) });
-                                }} />
-                                <LabelBadges labels={[label]} />
-                            </label>)}
-                            {filters.labelIds.some((id) => !labels.some((label) => label.id === id)) &&
-                                <span className="hint">A selected label is unavailable. Reset filters to clear it.</span>}
-                            {!labels.length && !filters.labelIds.length && <span className="muted">No labels available.</span>}
-                        </fieldset>
+                        <div className="filter-popover label-filter-popover">
+                            <div className="label-filter-heading">
+                                <strong>Labels</strong>
+                                <button type="button" className="text-button" aria-label="Clear label filters"
+                                    disabled={!filters.labelIds.length} onClick={() => updateQuery({ labelIds: [] })}>Clear</button>
+                            </div>
+                            <p className="label-filter-help">Match all selected labels</p>
+                            <div className="label-filter-options" role="group" aria-label="Filter by label">
+                                {labels.map((label) => <label
+                                    className={`checkbox label-filter-option${filters.labelIds.includes(label.id) ? ' is-selected' : ''}`}
+                                    key={label.id}>
+                                    <input type="checkbox" checked={filters.labelIds.includes(label.id)} onChange={(event) => {
+                                        updateQuery({ labelIds: event.target.checked ? [...filters.labelIds, label.id] : filters.labelIds.filter((id) => id !== label.id) });
+                                    }} />
+                                    <LabelBadges labels={[label]} />
+                                </label>)}
+                                {filters.labelIds.some((id) => !labels.some((label) => label.id === id)) &&
+                                    <p className="label-filter-empty" role="status">A selected label is unavailable. Use Clear to remove it.</p>}
+                                {!labels.length && !filters.labelIds.length &&
+                                    <p className="label-filter-empty" role="status">No labels available.</p>}
+                            </div>
+                        </div>
                     </details>
                 </div>
                 <div className="view-tabs">

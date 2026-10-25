@@ -95,11 +95,8 @@ export default function LoginPage() {
         <main className="login-page">
             <section className="login-card">
                 <div className="login-brand">
-                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" />
-                    <div>
-                        <strong>Parallel Systems</strong>
-                        <span>Task Management</span>
-                    </div>
+                    <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Parallel Systems — Devised to deliver" />
+                    <span>Task Management</span>
                 </div>
                 <div className="login-copy">
                     <span className="login-lock">
