@@ -12,7 +12,8 @@ import subprocess
 import json
 from urllib.parse import urlsplit
 
-SNIPPET = Path('/etc/nginx/snippets/parallel-systems-task-management.conf')
+NGINX_ROOT = Path('/etc/nginx')
+SNIPPET = NGINX_ROOT / 'snippets/parallel-systems-task-management.conf'
 TIMESHEET_ROOT = '/var/www/parallel-systems-timesheet/current'
 INCLUDE = f'include {SNIPPET};'
 
@@ -146,7 +147,7 @@ def plan_config(text, host, default_server=False):
 
 def checked_nginx_path(path):
     resolved = Path(path).resolve()
-    if not resolved.is_relative_to(Path('/etc/nginx')):
+    if not resolved.is_relative_to(NGINX_ROOT.resolve()):
         raise ValueError(f'Refusing to modify configuration outside /etc/nginx: {resolved}')
     return resolved
 
@@ -215,7 +216,9 @@ def prepare(host, source, state_path):
     paths = re.findall(r'^# configuration file (.+):$', result.stdout, re.MULTILINE)
     configs = {}
     for path in sorted(set(paths)):
-        target = checked_nginx_path(path)
+        # nginx -T also lists read-only includes such as Certbot TLS settings.
+        # Constrain planned writes below, rather than rejecting discovery reads.
+        target = Path(path).resolve()
         configs[target] = target.read_text()
     updates = {}
     matches = 0
@@ -258,6 +261,8 @@ def prepare(host, source, state_path):
     if SNIPPET.exists() and not SNIPPET.read_text().startswith('# Parallel Systems Task Management deployment-managed snippet'):
         raise ValueError('Existing snippet is not deployment-managed; refusing to overwrite it.')
     updates[SNIPPET] = snippet
+    for target in updates:
+        checked_nginx_path(target)
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.parent.chmod(0o700)
     entries = []

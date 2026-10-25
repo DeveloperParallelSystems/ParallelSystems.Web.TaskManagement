@@ -149,6 +149,61 @@ class NginxSetupChecks(unittest.TestCase):
         with self.assertRaises(ValueError):
             nginx.checked_nginx_path('/var/www/other.conf')
 
+    def test_certbot_include_is_preserved_during_prepare_and_restore(self):
+        with temporary_fixture('task-nginx-tls-') as folder:
+            root = Path(folder).resolve()
+            nginx_root = root / 'nginx'
+            nginx_root.mkdir()
+            config = nginx_root / 'site.conf'
+            tls = root / 'letsencrypt' / 'options-ssl-nginx.conf'
+            tls.parent.mkdir()
+            tls_contents = 'ssl_session_timeout 1440m;\nssl_protocols TLSv1.2 TLSv1.3;\n'
+            tls.write_text(tls_contents)
+            original = CONFIG.replace('listen 80;', f'listen 443 ssl; include {tls.as_posix()};')
+            config.write_text(original)
+            snippet = nginx_root / 'snippets' / 'tasks.conf'
+            source = Path(__file__).parents[1] / 'task-management.nginx.conf'
+            state = root / 'backups' / 'state.json'
+            dump = f'# configuration file {config}:\n# configuration file {tls}:\n'
+            with patch.object(nginx, 'NGINX_ROOT', nginx_root), \
+                 patch.object(nginx, 'SNIPPET', snippet), \
+                 patch.object(nginx, 'INCLUDE', f'include {snippet};'), \
+                 patch.object(nginx.subprocess, 'run', side_effect=[
+                     subprocess.CompletedProcess([], 0, stdout=dump),
+                     subprocess.CompletedProcess([], 0),
+                 ]):
+                nginx.prepare(HOST, source, state)
+                self.assertIn(f'include {snippet};', config.read_text())
+                self.assertIn(f'include {tls.as_posix()};', config.read_text())
+                self.assertEqual(tls.read_text(), tls_contents)
+                entries = nginx.json.loads(state.read_text())['files']
+                self.assertEqual({Path(entry['path']) for entry in entries}, {config, snippet})
+                nginx.restore(state)
+                self.assertEqual(config.read_text(), original)
+                self.assertEqual(tls.read_text(), tls_contents)
+                self.assertFalse(snippet.exists())
+
+    def test_matching_site_outside_nginx_is_rejected_before_any_write(self):
+        with temporary_fixture('task-nginx-external-') as folder:
+            root = Path(folder).resolve()
+            nginx_root = root / 'nginx'
+            nginx_root.mkdir()
+            config = root / 'external-site.conf'
+            config.write_text(CONFIG)
+            snippet = nginx_root / 'snippets' / 'tasks.conf'
+            source = Path(__file__).parents[1] / 'task-management.nginx.conf'
+            state = root / 'backups' / 'state.json'
+            dump = f'# configuration file {config}:\n'
+            with patch.object(nginx, 'NGINX_ROOT', nginx_root), \
+                 patch.object(nginx, 'SNIPPET', snippet), \
+                 patch.object(nginx, 'INCLUDE', f'include {snippet};'), \
+                 patch.object(nginx.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, stdout=dump)):
+                with self.assertRaisesRegex(ValueError, 'outside /etc/nginx'):
+                    nginx.prepare(HOST, source, state)
+            self.assertEqual(config.read_text(), CONFIG)
+            self.assertFalse(state.exists())
+            self.assertFalse(snippet.exists())
+
     def test_syntax_failure_restores_config_and_removes_only_new_snippet(self):
         with temporary_fixture('task-nginx-check-') as folder:
             root = Path(folder)

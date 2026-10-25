@@ -81,6 +81,9 @@ It is inserted inside matching content-serving `server` blocks with the selected
 unambiguous unnamed default Timesheet configuration is also supported. Redirect-only
 servers are skipped. Existing root, API/health proxies, Receipts include, and TLS
 settings are preserved. Subsequent deployments do not duplicate the include.
+Discovery reads externally included configuration, including Certbot's
+`/etc/letsencrypt/options-ssl-nginx.conf`, without modifying it. Every planned
+configuration write and rollback target must resolve inside `/etc/nginx`.
 Conflicting Task Management locations or ambiguous sites cause the tool to stop.
 
 For attachments, automatic setup also copies the existing direct `/api/` proxy
