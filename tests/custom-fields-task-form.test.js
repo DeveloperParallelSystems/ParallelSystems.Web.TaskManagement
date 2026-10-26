@@ -22,14 +22,23 @@ let index = 0;
 let state;
 let loaded;
 let detailEffect;
-export function reset(next, task = null) { state = next; loaded = task; slots = []; }
+let actualAssignments;
+export function reset(next, task = null, preserveInitialAssignments = false) {
+    state = next;
+    loaded = task;
+    slots = [];
+    actualAssignments = preserveInitialAssignments;
+}
 export function renderStart() { index = 0; }
 export function snapshot() { return state; }
 export function useState(initial) {
     const slot = index++;
     if (!(slot in slots)) {
         slots[slot] = typeof initial === 'function' ? initial() : initial;
-        if (slot === 0) { slots[slot] = { ...slots[slot], title: 'Task', originalAssigneeId: 'staff', assigneeId: 'staff', projectId: 'project', ...loaded }; }
+        if (slot === 0) {
+            const assignments = actualAssignments ? {} : { originalAssigneeId: 'staff', assigneeId: 'staff' };
+            slots[slot] = { ...slots[slot], title: 'Task', ...assignments, projectId: 'project', ...loaded };
+        }
         if (slot === 1 && loaded) { slots[slot] = { task: slots[0], canEditDetails: state.canEditDetails ?? true, allowedStatuses: [], activity: [] }; }
         if (slot === 2) { slots[slot] = false; }
         if (slot === 15) { slots[slot] = true; }
@@ -337,6 +346,68 @@ export function useNavigate() { return (location) => { state.navigation = locati
         await form().props.onSubmit({ preventDefault() {} });
         assert.equal(calls.at(-1).body.originalAssigneeId, 'historic-original', 'Hidden original is never replaced on an existing task');
         assert.equal(calls.at(-1).body.reviewerId, 'historic-reviewer', 'Hiding QA does not clear existing assignments');
+
+        state.auth.user.userId = 'my-account';
+        state.workspace.people = [
+            { id: 'legacy', userId: 'my-account', name: 'Legacy account', isActive: false },
+            { id: 'self-staff', userId: 'MY-ACCOUNT', name: 'My staff record', isActive: true },
+            { id: 'other-staff', userId: 'another-account', name: 'Other staff', isActive: true },
+        ];
+        taskId = 'new';
+        function assignedTo() {
+            const label = render().find((element) => element.type === 'label' &&
+                descendants(element).some((child) => child.type === 'span' && child.props.children === 'Assigned To'));
+            return descendants(label).find((element) => element.type === 'select');
+        }
+        reset(state, null, true);
+        assert.equal(assignedTo().props.value, 'self-staff', 'New tasks default to the active staff linked to the signed-in account');
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.assigneeId, 'self-staff');
+        assert.equal(calls.at(-1).body.originalAssigneeId, 'self-staff', 'Hidden original uses the defaulted current owner');
+        reset(state, null, true);
+        assignedTo().props.onChange({ target: { value: 'other-staff' } });
+        state.workspace.people = [...state.workspace.people];
+        assert.equal(assignedTo().props.value, 'other-staff', 'Lookup refresh must preserve a manual assignment');
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.assigneeId, 'other-staff');
+        state.auth.user.userId = 'unlinked-account';
+        reset(state, null, true);
+        assert.equal(assignedTo().props.value, '');
+        assert.equal(descendants(assignedTo()).find((element) => element.type === 'option' && element.props.value === '').props.children, 'Select staff');
+        delete state.auth.user.userId;
+        reset(state, null, true);
+        assert.equal(assignedTo().props.value, '', 'Missing account identity never matches an unlinked staff record');
+        state.auth.user.userId = 'my-account';
+        state.workspace.people[1].isActive = false;
+        reset(state, null, true);
+        assert.equal(assignedTo().props.value, '', 'Inactive or legacy choices are not eligible defaults');
+        state.workspace.people[1].isActive = true;
+        taskId = 'existing';
+        for (const owner of ['other-staff', '']) {
+            reset(state, { id: taskId, assigneeId: owner }, true);
+            assert.equal(assignedTo().props.value, owner, 'Existing task ownership is never defaulted');
+        }
+        state.auth.user.role = 'User';
+        taskId = 'new';
+        reset(state, null, true);
+        assert.ok(form(), 'A signed-in non-admin can open the actual task creation form');
+        assert.equal(assignedTo().props.value, 'self-staff');
+        assert.equal(assignedTo().props.disabled, false);
+        assert.equal(render().find((element) => element.type === 'fieldset').props.disabled, false);
+        const disciplineLabel = render().find((element) => element.type === 'label' &&
+            descendants(element).some((child) => child.type === 'span' && child.props.children === 'Discipline'));
+        assert.equal(descendants(disciplineLabel).find((element) => element.type === 'select').props.disabled, false);
+        assert.equal(projectSelect().props.disabled, false);
+        await form().props.onSubmit({ preventDefault() {} });
+        assert.equal(calls.at(-1).body.assigneeId, 'self-staff');
+        assert.equal(calls.at(-1).body.originalAssigneeId, 'self-staff');
+        assert.equal(calls.at(-1).url, '/api/task-management/tasks/live');
+        taskId = 'existing';
+        state.canEditDetails = false;
+        reset(state, { id: taskId, assigneeId: 'other-staff' }, true);
+        assert.equal(assignedTo().props.disabled, true, 'Unrelated viewers retain read-only task details');
+        assert.equal(render().find((element) => element.type?.name === 'TaskDiscussion').props.readOnly, true);
+        assert.equal(render().find((element) => element.type?.name === 'TaskAttachments').props.readOnly, true);
     }
     finally {
         globalThis.fetch = originalFetch;

@@ -31,7 +31,8 @@ test('shell omits saved views and retains mobile navigation with administrator-o
                 { location: path }, React.createElement(App))));
         }
         const user = render();
-        assert.doesNotMatch(user, /aria-label="Administration"|>New task</);
+        assert.doesNotMatch(user, /aria-label="Administration"/);
+        assert.match(user, /New task/);
         assert.doesNotMatch(user, /SAVED VIEWS|aria-label="Saved views"|href="\/tasks\?quick=/);
         assert.match(user, /aria-label="Search workspace tasks"/);
         assert.match(user, /aria-controls="workspace-navigation"/);

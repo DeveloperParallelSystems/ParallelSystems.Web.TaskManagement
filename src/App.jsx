@@ -53,7 +53,7 @@ const pages = {
     },
     '/dashboard': {
         title: 'Dashboard',
-        description: 'A little clarity for the work ahead.',
+        description: 'Track workload, progress and overdue tasks by client.',
     },
     '/projects': {
         title: 'Projects',
@@ -162,7 +162,7 @@ export default function App() {
         function createShortcut(event) {
             const editing = event.target.closest('input, textarea, select, [contenteditable="true"]');
             if (event.key.toLowerCase() === 'c' && !editing && !event.ctrlKey && !event.metaKey && !event.altKey &&
-                auth.user?.role === 'Administrator' && workspace.status === 'ready' && !selected && canCreateTask &&
+                auth.user && workspace.status === 'ready' && !selected && canCreateTask &&
                 (projectScope || location.pathname === '/tasks' || location.pathname === '/dashboard') &&
                 !document.querySelector('dialog[open]')) {
                 event.preventDefault();
@@ -173,7 +173,7 @@ export default function App() {
         return () => {
             window.removeEventListener('keydown', createShortcut);
         };
-    }, [auth.user?.role, workspace.status, selected, navigate, location.search, location.pathname, taskBase, projectScope, canCreateTask]);
+    }, [auth.user, workspace.status, selected, navigate, location.search, location.pathname, taskBase, projectScope, canCreateTask]);
 
     useEffect(() => {
         const timer = setTimeout(() => setToast(''), 4500);
@@ -347,7 +347,7 @@ export default function App() {
                                     <RefreshCw size={15} />
                                     <span>Refresh</span>
                                 </button>
-                                {auth.user.role === 'Administrator' && canCreateTask && (projectScope || location.pathname === '/tasks' || location.pathname === '/dashboard') && (
+                                {canCreateTask && (projectScope || location.pathname === '/tasks' || location.pathname === '/dashboard') && (
                                     <button
                                         className="button primary"
                                         disabled={workspace.status !== 'ready'}

@@ -12,7 +12,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { defaultPresentationGroups } from '../src/features/tasks/workflowPresentation.js';
 
-test('board and dashboard use configured columns without changing canonical statuses or visibility', async () => {
+test('board uses configured columns while the client dashboard remains independent of board layout', async () => {
     const scratchRoot = resolve('.tmp');
     mkdirSync(scratchRoot, { recursive: true });
     const scratch = mkdtempSync(join(scratchRoot, 'workflow-render-'));
@@ -51,13 +51,15 @@ test('board and dashboard use configured columns without changing canonical stat
         assert.ok(board.indexOf('Visible task') > board.indexOf('>Working<'));
         assert.match(board, />Backlog</);
         const dashboard = render(Dashboard);
-        assert.match(dashboard, /&lt;script&gt;Custom planning/);
-        assert.match(dashboard, /<progress(?=[^>]*aria-label="Working")(?=[^>]*value="1")[^>]*>/);
+        assert.match(dashboard, /Client overview/);
+        assert.match(dashboard, /aria-label="General tasks task metrics"/);
+        assert.doesNotMatch(dashboard, /Custom planning|aria-label="Working"/);
         state.workspace.workflowPresentation = { data: null, status: 'error', error: { status: 500 } };
         const unavailable = render(TasksPage);
         assert.match(unavailable, /Board layout is unavailable/);
         assert.doesNotMatch(unavailable, /class="board-column/);
-        assert.match(render(Dashboard), /Board layout is unavailable/);
+        assert.doesNotMatch(render(Dashboard), /Board layout is unavailable/);
+        assert.match(render(Dashboard), /aria-label="General tasks task metrics"/);
         const { default: Editor } = await component('src/features/tasks/WorkflowPresentationEditor.jsx', 'editor');
         const editor = renderToStaticMarkup(React.createElement(Editor, { groups, onChange: () => {}, disabled: true }));
         assert.match(editor, /fieldset[^>]*disabled/);

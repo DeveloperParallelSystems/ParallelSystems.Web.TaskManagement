@@ -9,7 +9,7 @@ import { loadTaskAttachments, removeTaskAttachment } from './attachmentState';
 import { attachmentPreviewType } from './attachmentPreview.js';
 import TaskAttachmentPreview from './TaskAttachmentPreview.jsx';
 
-export default function TaskAttachments({ taskId, onEditingChange, onHistoryChange }) {
+export default function TaskAttachments({ taskId, onEditingChange, onHistoryChange, readOnly = false }) {
     const dispatch = useDispatch();
     const reduxStore = useStore();
     const userId = useSelector((state) => state.auth.user?.userId);
@@ -75,7 +75,7 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
     }
 
     function choose(files) {
-        if (busy) {
+        if (busy || readOnly) {
             return;
         }
         const selected = Array.from(files).map((file) => {
@@ -88,7 +88,7 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
     }
 
     async function upload(items) {
-        if (busy) {
+        if (busy || readOnly) {
             return;
         }
         setBusy(true);
@@ -152,6 +152,9 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
     }
 
     async function remove() {
+        if (readOnly) {
+            return;
+        }
         const item = removing;
         cancelRemove();
         setBusy(true);
@@ -218,9 +221,9 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
                 <div className="attachment-actions">
                     <button type="button" className="button" disabled={busy || attachments?.status === 'loading'}
                         onClick={() => dispatch(loadTaskAttachments({ taskId }))}><RefreshCw size={15} /> Refresh</button>
-                    <button type="button" className="button primary" disabled={busy} onClick={() => inputRef.current?.click()}>
+                    {!readOnly && <button type="button" className="button primary" disabled={busy} onClick={() => inputRef.current?.click()}>
                         <Upload size={15} /> Add files
-                    </button>
+                    </button>}
                 </div>
             </div>
             <p className="muted">PDF, images (PNG/JPEG), Word, Excel or PowerPoint · up to 10 MB each. Files upload separately from saving the task.</p>
@@ -228,11 +231,11 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
             {attachments?.error && <div className="error" role="alert">{attachments.error}</div>}
             {message && <p role="status">{message}</p>}
             <input ref={inputRef} type="file" className="sr-only" aria-label="Choose attachments" accept={attachmentAccept} multiple
-                disabled={busy} onChange={(event) => {
+                disabled={busy || readOnly} onChange={(event) => {
                     choose(event.target.files);
                     event.target.value = '';
                 }} />
-            <div className={`attachment-dropzone${dragOver ? ' is-dragging' : ''}`}
+            {!readOnly && <div className={`attachment-dropzone${dragOver ? ' is-dragging' : ''}`}
                 onDragOver={(event) => {
                     event.preventDefault();
                     setDragOver(!busy);
@@ -245,7 +248,7 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
                 }}>
                 <Upload size={24} aria-hidden="true" />
                 <span>Drag files here, or use Add files.</span>
-            </div>
+            </div>}
             {queue.length > 0 && (
                 <div className="attachment-queue">
                     <h3>Upload queue</h3>
@@ -293,7 +296,7 @@ export default function TaskAttachments({ taskId, onEditingChange, onHistoryChan
                                 aria-label={`Preview ${item.fileName}`}><Eye size={15} aria-hidden="true" /> Preview</button>}
                             <button type="button" className="button" disabled={Boolean(downloading)} onClick={() => download(item)}
                                 aria-label={`Download ${item.fileName}`}><Download size={15} /> {downloading === item.id ? 'Downloading…' : 'Download'}</button>
-                            {item.canDelete && <button type="button" className="icon-button" disabled={busy}
+                            {!readOnly && item.canDelete && <button type="button" className="icon-button" disabled={busy}
                                 aria-label={`Remove ${item.fileName}`} onClick={() => setRemoving(item)}><Trash2 size={16} /></button>}
                         </div>
                     </li>

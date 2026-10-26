@@ -86,6 +86,12 @@ export function useDispatch() {
         assert.match(list, /aria-label="Preview photo.png"/);
         assert.doesNotMatch(list, /aria-label="Preview notes.docx"/);
         assert.match(list, /aria-label="Download notes.docx"/);
+        const readOnlyList = renderToStaticMarkup(React.createElement(Provider, { store }, React.createElement(TaskAttachments, {
+            taskId: 'task', readOnly: true, onEditingChange() {}, onHistoryChange() {},
+        })));
+        assert.match(readOnlyList, /aria-label="Preview review.pdf"/);
+        assert.match(readOnlyList, /aria-label="Download notes.docx"/);
+        assert.doesNotMatch(readOnlyList, /Add files|attachment-dropzone|aria-label="Remove /);
         const pdf = renderToStaticMarkup(React.createElement(AttachmentPreviewContent, {
             attachment, resource: { type: 'application/pdf', url: 'blob:private-file' },
         }));

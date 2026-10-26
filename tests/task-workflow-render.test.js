@@ -69,7 +69,9 @@ test('one shared board displays both disciplines without workflow headings and a
         assert.doesNotMatch(board, /<Check drawings>/);
         const dashboard = render(Dashboard);
         assert.doesNotMatch(dashboard, /Drafting · Drawing delivery v2/);
-        assert.equal((dashboard.match(/class="progress-row"/g) || []).length, 4);
+        assert.match(dashboard, /Client overview/);
+        assert.match(dashboard, /aria-label="General tasks workload"/);
+        assert.doesNotMatch(dashboard, /View projects|View by/);
         const filteredBoard = render(TasksPage, {}, '/tasks?discipline=Drafting');
         assert.doesNotMatch(filteredBoard, /Development only|Development task/);
         assert.equal((filteredBoard.match(/<article class="task-card(?: [^"]*)?"/g) || []).length, 1);

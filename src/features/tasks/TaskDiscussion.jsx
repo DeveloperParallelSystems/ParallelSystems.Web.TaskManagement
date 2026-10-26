@@ -16,7 +16,7 @@ function editComment(comment, people) {
     return { ...comment, initialBody: comment.body, mentions, initialMentions: JSON.stringify(commentInput({ ...comment, mentions }).mentions) };
 }
 
-export default function TaskDiscussion({ taskId, onEditingChange }) {
+export default function TaskDiscussion({ taskId, onEditingChange, readOnly = false }) {
     const dispatch = useDispatch();
     const discussion = useSelector((state) => state.workspace.discussions[taskId]);
     const user = useSelector((state) => state.auth.user);
@@ -186,7 +186,7 @@ export default function TaskDiscussion({ taskId, onEditingChange }) {
 
     async function submit(event) {
         event.preventDefault();
-        if (busy || !editor.body.trim()) {
+        if (busy || readOnly || !editor.body.trim()) {
             return;
         }
         setBusy(true);
@@ -232,6 +232,9 @@ export default function TaskDiscussion({ taskId, onEditingChange }) {
     }
 
     async function removeComment() {
+        if (readOnly) {
+            return;
+        }
         setBusy(true);
         setError(null);
         try {
@@ -270,7 +273,7 @@ export default function TaskDiscussion({ taskId, onEditingChange }) {
                             ) : <span key={index}>{part.text}</span>)}
                         </p>
                     )}
-                    {!comment.deleted && (
+                    {!comment.deleted && !readOnly && (
                         <div className="comment-actions">
                             <button type="button" className="text-button" disabled={busy} onClick={() => replaceEditor(blankEditor(comment.parentId || comment.id))}>
                                 <Reply size={13} /> Reply
@@ -323,7 +326,7 @@ export default function TaskDiscussion({ taskId, onEditingChange }) {
             {!discussion?.hasLoaded && discussion?.status !== 'error' && <p className="muted" role="status">Loading discussion…</p>}
             {discussion?.hasLoaded && (
                 <>
-                    <form className="comment-composer" onSubmit={submit} aria-busy={busy}>
+                    {!readOnly && <form className="comment-composer" onSubmit={submit} aria-busy={busy}>
                         <div className="comment-composer-heading">
                             <span className="avatar comment-avatar" aria-hidden="true">{initials(user?.name)}</span>
                             <strong>{composerTitle}</strong>
@@ -379,7 +382,7 @@ export default function TaskDiscussion({ taskId, onEditingChange }) {
                         {range && !pickerDismissed && !candidates.length && <p className="muted" role="status">No eligible staff match.</p>}
                         {editor.mentions.length >= 20 && <p className="muted">A comment can contain up to 20 selected mentions.</p>}
                         {dirty && <p className="muted comment-draft-status" role="status">Draft not saved</p>}
-                    </form>
+                    </form>}
                     <div className="discussion-threads" aria-label="Task comments">
                         {!discussion.items.length && <p className="muted">No comments yet. Start the discussion.</p>}
                         {discussionThreads(discussion.items).map(({ comment, replies }) => (

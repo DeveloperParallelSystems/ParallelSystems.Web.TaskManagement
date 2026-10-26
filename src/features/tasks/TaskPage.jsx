@@ -49,7 +49,8 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
     const statusSettings = useSelector((state) => state.workspace.statusSettings?.data);
     const statusSettingsError = useSelector((state) => state.workspace.statusSettings?.error);
     const attachments = useSelector((state) => state.workspace.attachments?.[id]);
-    const administrator = useSelector((state) => state.auth.user.role === 'Administrator');
+    const user = useSelector((state) => state.auth.user);
+    const administrator = user.role === 'Administrator';
     const headingRef = useRef(null);
     const confirmRef = useRef(null);
     const navigate = useNavigate();
@@ -59,8 +60,12 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
         const parent = tasks.find((task) => task.id === parentTaskId);
         const projectId = parent && projects.some((project) => project.id === parent.projectId)
             ? parent.projectId : projectScope && projectScope !== 'general' ? projectScope : '';
+        const assignedStaff = id === 'new' && user.userId
+            ? people.find((person) => person.isActive && person.userId?.toLowerCase() === user.userId.toLowerCase())
+            : null;
         return {
             ...emptyTask,
+            assigneeId: assignedStaff?.id || '',
             projectId,
             clientId: parent ? taskClientId(parent, projects, clients) || ''
                 : projectClientContext(projects.find((project) => project.id === projectId), clients, location.search) || '',
@@ -102,7 +107,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
     const customValues = projectFieldDraft(customDrafts, values.projectId, details?.task);
     const customReady = Boolean(customResource.data && !customResource.error && !customResource.invalidated && customResource.data.version === columnRevision);
     const customStale = Object.hasOwn(customDraftVersions, values.projectId) && customDraftVersions[values.projectId] !== columnRevision;
-    const editable = id === 'new' ? administrator : details?.canEditDetails;
+    const editable = id === 'new' || details?.canEditDetails;
     const customSaveBlocked = Boolean(editable && customProjectId && (!customReady || customStale));
     const unsaved = dirty || discussionEditing.dirty || attachmentEditing.dirty || checklistEditing.dirty || labelEditing.dirty || linkedTicketEditing.dirty;
     const pendingSave = saving || customReloading || discussionEditing.saving || attachmentEditing.saving || checklistEditing.saving || labelEditing.saving || linkedTicketEditing.saving;
@@ -271,7 +276,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
     }, [id, statusSettings?.version]);
 
     function change(name, value) {
-        if (['discipline', 'projectId', 'clientId'].includes(name) && !administrator) {
+        if (id !== 'new' && ['discipline', 'projectId', 'clientId'].includes(name) && !administrator) {
             return;
         }
         if (name === 'projectId' && Object.hasOwn(customDrafts, values.projectId) &&
@@ -455,7 +460,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                     onChange={(event) => change(name, event.target.value)}
                 >
                     <option value="">
-                        {name === 'originalAssigneeId' || (name === 'assigneeId' && createOriginalFromOwner) ? 'Select staff' : 'Unassigned'}
+                        {name === 'originalAssigneeId' || (name === 'assigneeId' && id === 'new') ? 'Select staff' : 'Unassigned'}
                     </option>
                     {people
                         .filter((person) => person.isActive || person.id === values[name])
@@ -466,16 +471,6 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                         ))}
                 </select>
             </label>
-        );
-    }
-
-    if (id === 'new' && !administrator) {
-        return (
-            <section className="panel">
-                <h1>Task creation is restricted</h1>
-                <p>Only administrators can create tasks.</p>
-                <button className="button" onClick={onClose}>Back to tasks</button>
-            </section>
         );
     }
 
@@ -608,7 +603,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                                                             <span>Discipline</span>
                                                             <select form="task-details-form"
                                                                 value={values.discipline}
-                                                                disabled={!administrator || !editable}
+                                                                disabled={(id !== 'new' && !administrator) || !editable}
                                                                 onChange={(event) => change('discipline', event.target.value)}
                                                             >
                                                                 {disciplines.map((discipline) => <option key={discipline}>{discipline}</option>)}
@@ -619,7 +614,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                                                             <span>Project</span>
                                                             <select form="task-details-form"
                                                                 value={values.projectId}
-                                                                disabled={!administrator || (id === 'new' && Boolean(projectScope))}
+                                                                disabled={(id !== 'new' && !administrator) || (id === 'new' && Boolean(projectScope))}
                                                                 onChange={(event) => change('projectId', event.target.value)}
                                                             >
                                                                 <option value="">General · no project</option>
@@ -664,7 +659,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                                                                 placeholder="Describe the work and what a successful result looks like…"
                                                             />
                                                         </label>
-                                                        {id === 'new' && <label className="field full">
+                                                        {id === 'new' && administrator && <label className="field full">
                                                             <span>Parent ticket (optional)</span>
                                                             <select form="task-details-form" value={values.parentTaskId}
                                                                 onChange={(event) => change('parentTaskId', event.target.value)}>
@@ -689,7 +684,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                             </form>
                         )}
                         {linkedTicketEditing.dirty && <p className="hint">Link or cancel the ticket selection before saving task details or labels.</p>}
-                        {id !== 'new' && <TaskDiscussion taskId={id} onEditingChange={setDiscussionEditing} />}
+                        {id !== 'new' && <TaskDiscussion taskId={id} readOnly={!editable} onEditingChange={setDiscussionEditing} />}
                     </div>
                     <aside className="task-detail-side" aria-label="Task planning">
                         {!loading && (details || id === 'new') && values.projectId && <section className="panel task-project-fields-panel" aria-labelledby="task-custom-heading">
@@ -775,7 +770,7 @@ export default function TaskPage({ id, onClose, onSaved, onEditingChange, onTask
                 aria-labelledby="task-attachments-tab" tabIndex={0} hidden={activeTab !== 'attachments'}>
                 {id !== 'new' && <TaskAttachments
                     key={JSON.stringify(people.map((person) => [person.id, person.userId, person.accountIsActive]))}
-                    taskId={id} onEditingChange={setAttachmentEditing}
+                    taskId={id} readOnly={!editable} onEditingChange={setAttachmentEditing}
                     onHistoryChange={refreshHistory} />}
             </div>
             {blocker.state === 'blocked' && (
