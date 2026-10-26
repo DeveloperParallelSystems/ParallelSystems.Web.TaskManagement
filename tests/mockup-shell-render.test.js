@@ -33,6 +33,7 @@ test('shell omits saved views and retains mobile navigation with administrator-o
         const user = render();
         assert.doesNotMatch(user, /aria-label="Administration"/);
         assert.match(user, /New task/);
+        assert.doesNotMatch(render('/dashboard'), /New task/);
         assert.doesNotMatch(user, /SAVED VIEWS|aria-label="Saved views"|href="\/tasks\?quick=/);
         assert.match(user, /aria-label="Search workspace tasks"/);
         assert.match(user, /aria-controls="workspace-navigation"/);
@@ -46,6 +47,7 @@ test('shell omits saved views and retains mobile navigation with administrator-o
         assert.match(admin, /href="\/discipline-statuses"/);
         assert.match(admin, /href="\/status-catalog"/);
         assert.match(admin, /New task/);
+        assert.doesNotMatch(render('/dashboard'), /New task/);
         const calendar = render('/tasks?view=calendar');
         assert.match(calendar, /<a(?=[^>]*href="\/tasks\?view=calendar")(?=[^>]*class="active")[^>]*>/);
         const mobileNav = calendar.match(/<nav class="mobile-bottom-nav"[^>]*>(.*?)<\/nav>/s)[1];

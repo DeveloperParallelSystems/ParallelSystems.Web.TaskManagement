@@ -163,7 +163,7 @@ export default function App() {
             const editing = event.target.closest('input, textarea, select, [contenteditable="true"]');
             if (event.key.toLowerCase() === 'c' && !editing && !event.ctrlKey && !event.metaKey && !event.altKey &&
                 auth.user && workspace.status === 'ready' && !selected && canCreateTask &&
-                (projectScope || location.pathname === '/tasks' || location.pathname === '/dashboard') &&
+                (projectScope || location.pathname === '/tasks') &&
                 !document.querySelector('dialog[open]')) {
                 event.preventDefault();
                 navigate({ pathname: `${taskBase}/new`, search: withoutParentSelection(location.search) });
@@ -347,7 +347,7 @@ export default function App() {
                                     <RefreshCw size={15} />
                                     <span>Refresh</span>
                                 </button>
-                                {canCreateTask && (projectScope || location.pathname === '/tasks' || location.pathname === '/dashboard') && (
+                                {canCreateTask && (projectScope || location.pathname === '/tasks') && (
                                     <button
                                         className="button primary"
                                         disabled={workspace.status !== 'ready'}
