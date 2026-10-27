@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { Building2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, FolderOpen } from 'lucide-react';
 import { dashboardTaskOverdue } from './clientDashboard.js';
 import { dateLabel } from './workflow.js';
-import { isTaskClosed, taskStatusName } from './taskWorkflow.js';
+import { taskStatusName } from './taskWorkflow.js';
 import { taskPersonName } from './taskColumns.js';
 
 const pageSize = 5;
@@ -12,7 +12,6 @@ export default function ClientWorkloadCard({ group, people, today, onOpen, other
     const [requestedPage, setRequestedPage] = useState(1);
     const detailsId = useId();
     const { summary, tasks } = group;
-    const nextTask = tasks.find((task) => !isTaskClosed(task));
     const pageCount = Math.max(1, Math.ceil(tasks.length / pageSize));
     const page = Math.min(requestedPage, pageCount);
     const start = (page - 1) * pageSize;
@@ -34,15 +33,6 @@ export default function ClientWorkloadCard({ group, people, today, onOpen, other
             <div><dt>Due this week</dt><dd>{summary.dueThisWeek}</dd></div>
             <div><dt>Without owner</dt><dd className={summary.withoutOwner > 0 ? 'overdue' : undefined}>{summary.withoutOwner}</dd></div>
         </dl>
-        {nextTask ? <button type="button" className="client-workload-next"
-            aria-label={`Open next task: ${nextTask.title}`} onClick={() => onOpen(nextTask.id)}>
-            <span><small>Next task</small><strong>{nextTask.title}</strong></span>
-            <span className={dashboardTaskOverdue(nextTask, today) ? 'overdue' : undefined}>
-                {dateLabel(nextTask.dueDate)}
-            </span>
-        </button> : <p className="client-workload-next-empty">
-            {tasks.length ? 'No active tasks in this view.' : 'No tasks match this date filter.'}
-        </p>}
         <button type="button" className="button client-workload-toggle" aria-expanded={expanded}
             aria-controls={detailsId} onClick={() => setExpanded((current) => !current)}>
             {expanded ? 'Hide tasks' : 'View tasks'}

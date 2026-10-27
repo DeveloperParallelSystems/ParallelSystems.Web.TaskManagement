@@ -317,48 +317,6 @@
     font-size: 13px;
 }
 
-.client-workload-next {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 6px 12px;
-    width: 100%;
-    margin: 0 0 12px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font: inherit;
-    font-size: 12px;
-    text-align: left;
-    overflow-wrap: anywhere;
-    cursor: pointer;
-}
-
-.client-workload-next > span:first-child {
-    flex: 1 1 160px;
-    min-width: 0;
-}
-
-.client-workload-next small {
-    display: block;
-    margin-bottom: 3px;
-    font-size: 12px;
-}
-
-.client-workload-next strong {
-    color: #25342e;
-    font-size: 13px;
-    font-weight: 500;
-}
-
-.client-workload-next-empty {
-    margin: 0 0 12px;
-    color: var(--muted);
-    font-size: 13px;
-}
-
 .client-workload-details {
     margin-top: 16px;
     padding-top: 4px;
@@ -399,14 +357,12 @@
 }
 
 .client-workload-task:hover strong,
-.client-workload-next:hover strong,
 .client-attention-task:hover strong {
     color: var(--green);
     text-decoration: underline;
 }
 
 .client-workload-task:focus-visible,
-.client-workload-next:focus-visible,
 .client-attention-task:focus-visible {
     outline: 2px solid var(--green);
     outline-offset: 3px;
@@ -535,8 +491,7 @@
 }
 
 @media (pointer: coarse) {
-    .client-workload-card .client-workload-toggle,
-    .client-workload-next {
+    .client-workload-card .client-workload-toggle {
         min-height: 44px;
     }
 }

@@ -53,10 +53,10 @@ test('client dashboard renders permission-scoped client cards without a project 
         assert.doesNotMatch(acme, /<dt>Overdue tasks<\/dt>/);
         assert.match(acme, /<dt>Due this week<\/dt><dd>0<\/dd>/);
         assert.match(acme, /<dt>Without owner<\/dt><dd class="overdue">2<\/dd>/);
-        assert.match(acme, /aria-label="Open next task: &lt;script&gt;private title&lt;\/script&gt;"/);
+        assert.doesNotMatch(acme, /client-workload-next|Open next task|Next task/);
         const empty = html.split('aria-label="Zero workload"')[1].split('</article>')[0];
         assert.equal((empty.match(/<dd>0<\/dd>/g) || []).length, 3);
-        assert.match(empty, /On track|No tasks match this date filter/);
+        assert.match(empty, /On track/);
         assert.match(html, /aria-label="Beta task metrics"/);
         assert.match(html, /aria-label="Unassigned task metrics"/);
         assert.match(html, /aria-label="General tasks task metrics"/);
@@ -183,23 +183,6 @@ export function useLocalToday() {
             return descendants(Card(props));
         }
         const toggle = () => renderCard().find((node) => node.props.className === 'button client-workload-toggle');
-        const preview = renderCard().find((node) => node.props.className === 'client-workload-next');
-        preview.props.onClick();
-        assert.equal(opened.at(-1), 'a-0');
-        const closedFirst = {
-            ...cardProps,
-            group: {
-                ...cardProps.group,
-                tasks: [{ ...tasks[0], status: 'Completed' }, ...cardProps.group.tasks.slice(1)],
-            },
-        };
-        renderCard(closedFirst).find((node) => node.props.className === 'client-workload-next').props.onClick();
-        assert.equal(opened.at(-1), 'a-1');
-        const closedOnly = {
-            ...cardProps,
-            group: { ...cardProps.group, tasks: [{ ...tasks[0], status: 'Cancelled' }] },
-        };
-        assert.equal(renderCard(closedOnly).some((node) => node.props.className === 'client-workload-next'), false);
         toggle().props.onClick();
         let taskButtons = renderCard().filter((node) => node.props.className === 'client-workload-task');
         assert.equal(taskButtons.length, 5);
