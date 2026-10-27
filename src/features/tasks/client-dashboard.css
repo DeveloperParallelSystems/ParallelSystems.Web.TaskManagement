@@ -2,11 +2,20 @@
     min-width: 0;
 }
 
+.client-dashboard > .section-heading {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-bottom: 14px;
+}
+
 .client-dashboard-summary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 18px;
-    margin-bottom: 26px;
+    gap: 12px;
+    margin-bottom: 24px;
 }
 
 .client-dashboard-summary article {
@@ -14,22 +23,33 @@
     flex-direction: column;
     align-items: flex-start;
     min-width: 0;
-    min-height: 148px;
-    padding: 22px;
+    min-height: 126px;
+    padding: 16px;
     border: 1px solid var(--line);
-    border-radius: 18px;
+    border-radius: 14px;
     background: #fff;
+    box-shadow: var(--shadow-sm);
 }
 
 .client-summary-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
     color: #53634f;
-    font-size: 14px;
+    font-size: 13px;
+}
+
+.client-summary-label svg {
+    flex-shrink: 0;
+    color: var(--muted);
 }
 
 .client-summary-value {
     margin: 6px 0;
     color: var(--navy);
-    font-size: 40px;
+    font-size: 34px;
     font-weight: 600;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
@@ -38,7 +58,7 @@
 .client-summary-detail,
 .client-summary-badge {
     margin-top: auto;
-    font-size: 13px;
+    font-size: 12px;
     overflow-wrap: anywhere;
 }
 
@@ -47,8 +67,8 @@
 }
 
 .client-summary-badge {
-    padding: 3px 12px;
-    border-radius: 20px;
+    padding: 3px 8px;
+    border-radius: 6px;
     color: #316746;
     background: #e6f2e5;
     font-weight: 600;
@@ -59,14 +79,18 @@
     background: #fbefec;
 }
 
+.client-dashboard-summary article.is-alert .client-summary-value {
+    color: #a6473e;
+}
+
 .client-dashboard-filters {
     position: relative;
     z-index: 6;
     display: grid;
-    grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(150px, 1fr));
-    gap: 14px;
-    margin-bottom: 18px;
-    padding: 14px 16px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 13px 15px;
     border: 1px solid var(--line);
     border-radius: 12px;
     background: #fff;
@@ -167,14 +191,14 @@
 
 .client-workload-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
-    gap: 18px;
+    gap: 16px;
 }
 
 .client-workload-card {
     min-width: 0;
-    padding: 20px;
+    padding: 18px;
     border: 1px solid var(--line);
     border-radius: 12px;
     background: #fff;
@@ -187,20 +211,30 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+}
+
+.client-workload-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
 }
 
 .client-workload-icon {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
     border-radius: 9px;
     color: var(--green);
     background: #edf4e8;
 }
 
-.client-workload-overdue {
+.client-workload-overdue,
+.client-workload-on-track {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -209,16 +243,24 @@
     color: #a6473e;
     background: #fbefec;
     font-size: 12px;
+    flex-shrink: 0;
+}
+
+.client-workload-on-track {
+    color: #316746;
+    background: #e6f2e5;
 }
 
 .client-workload-card h3 {
     margin: 0;
-    font-size: 17px;
+    color: var(--navy);
+    font-size: 16px;
+    line-height: 1.3;
     overflow-wrap: anywhere;
 }
 
 .client-workload-total {
-    margin: 12px 0 16px;
+    margin: 0 0 14px;
     color: var(--muted);
     font-size: 13px;
 }
@@ -226,16 +268,19 @@
 .client-workload-total strong {
     margin-right: 5px;
     color: var(--navy);
-    font-size: 32px;
+    font-size: 28px;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
 }
 
 .client-workload-metrics {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-    margin: 0 0 20px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
 }
 
 .client-workload-metrics > div {
@@ -251,7 +296,7 @@
 .client-workload-metrics dd {
     margin: 4px 0 0;
     color: var(--navy);
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
@@ -260,9 +305,58 @@
     color: #a6473e;
 }
 
-.client-workload-toggle {
+.client-workload-card .client-workload-toggle {
+    display: flex;
     justify-content: space-between;
     width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 9px;
+    background: #f4f6f2;
+    color: var(--green);
+    font-size: 13px;
+}
+
+.client-workload-next {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    width: 100%;
+    margin: 0 0 12px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.client-workload-next > span:first-child {
+    flex: 1 1 160px;
+    min-width: 0;
+}
+
+.client-workload-next small {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 12px;
+}
+
+.client-workload-next strong {
+    color: #25342e;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.client-workload-next-empty {
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-size: 13px;
 }
 
 .client-workload-details {
@@ -305,12 +399,14 @@
 }
 
 .client-workload-task:hover strong,
+.client-workload-next:hover strong,
 .client-attention-task:hover strong {
     color: var(--green);
     text-decoration: underline;
 }
 
 .client-workload-task:focus-visible,
+.client-workload-next:focus-visible,
 .client-attention-task:focus-visible {
     outline: 2px solid var(--green);
     outline-offset: 3px;
@@ -342,7 +438,35 @@
 }
 
 .client-dashboard-attention {
-    margin-top: 24px;
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.client-dashboard-attention h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 17px;
+}
+
+.client-dashboard-attention .panel-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.client-dashboard-attention h2 > svg {
+    flex-shrink: 0;
+    color: #a6473e;
+}
+
+.client-attention-count {
+    padding: 1px 7px;
+    border-radius: 5px;
+    color: #a6473e;
+    background: #fbefec;
+    font-size: 12px;
+    font-weight: 500;
 }
 
 .client-attention-task {
@@ -352,7 +476,7 @@
     flex-wrap: wrap;
     gap: 8px 16px;
     width: 100%;
-    padding: 14px 0;
+    padding: 12px 0;
     border: 0;
     border-top: 1px solid var(--line);
     background: transparent;
@@ -375,15 +499,25 @@
     font-size: 12px;
 }
 
-@media (max-width: 1200px) {
-    .client-dashboard-summary,
-    .client-workload-grid {
+.client-attention-task > .overdue {
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #fbefec;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+@media (max-width: 1000px) {
+    .client-dashboard-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .client-dashboard-filters {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
 @media (max-width: 760px) {
-    .client-dashboard-filters,
     .client-workload-grid,
     .client-dashboard-other .client-workload-grid {
         grid-template-columns: minmax(0, 1fr);
@@ -394,8 +528,15 @@
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 380px) {
     .client-dashboard-summary {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (pointer: coarse) {
+    .client-workload-card .client-workload-toggle,
+    .client-workload-next {
+        min-height: 44px;
     }
 }

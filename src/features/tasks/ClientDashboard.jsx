@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
+import { CalendarDays, CircleAlert, Clock3, Layers, UserRound } from 'lucide-react';
 import { useLocalToday } from './TaskCalendar.jsx';
 import { clientDashboardGroups, dashboardTaskOverdue, dashboardTaskSummary, sortDashboardClients } from './clientDashboard.js';
 import ClientDashboardFilters from './ClientDashboardFilters.jsx';
@@ -22,14 +23,14 @@ export default function Dashboard({ onOpen }) {
     const noOverdueMessage = due === 'all' ? 'On track' : 'None in this view';
     const overdueTone = summary.overdue > 0 ? ' is-alert' : '';
     const summaryCards = [
-        { label: 'Tasks', value: summary.total,
+        { label: 'Tasks', value: summary.total, icon: Layers,
             detail: `across ${selected.length} ${selected.length === 1 ? 'client' : 'clients'}` },
-        { label: 'Overdue', value: summary.overdue,
+        { label: 'Overdue', value: summary.overdue, icon: Clock3,
             detail: summary.overdue ? 'Needs attention' : noOverdueMessage,
             badge: `client-summary-badge${overdueTone}` },
-        { label: 'Due this week', value: summary.dueThisWeek,
+        { label: 'Due this week', value: summary.dueThisWeek, icon: CalendarDays,
             detail: summary.dueThisWeek ? 'upcoming deadlines' : 'nothing coming up' },
-        { label: 'Without owner', value: summary.withoutOwner,
+        { label: 'Without owner', value: summary.withoutOwner, icon: UserRound,
             detail: summary.withoutOwner ? 'needs assignment' : 'everything assigned' },
     ];
     const overdueTasks = visible.flatMap((group) => group.tasks.filter((task) => dashboardTaskOverdue(task, today))
@@ -38,13 +39,18 @@ export default function Dashboard({ onOpen }) {
 
     return <div className="client-dashboard">
         <section className="client-dashboard-summary" aria-label="Selected client task summary">
-            {summaryCards.map((card) => <article key={card.label} aria-label={card.label}>
-                <span className="client-summary-label">{card.label}</span>
-                <strong className="client-summary-value">{card.value}</strong>
-                <span className={card.badge && selected.length > 0 ? card.badge : 'client-summary-detail'}>
-                    {selected.length ? card.detail : 'No clients selected'}
-                </span>
-            </article>)}
+            {summaryCards.map((card) => {
+                const Icon = card.icon;
+
+                return <article key={card.label} aria-label={card.label}
+                    className={card.label === 'Overdue' && summary.overdue > 0 ? 'is-alert' : undefined}>
+                    <span className="client-summary-label">{card.label}<Icon size={16} aria-hidden="true" /></span>
+                    <strong className="client-summary-value">{card.value}</strong>
+                    <span className={card.badge && selected.length > 0 ? card.badge : 'client-summary-detail'}>
+                        {selected.length ? card.detail : 'No clients selected'}
+                    </span>
+                </article>;
+            })}
         </section>
         <div className="section-heading">
             <h2>Client overview</h2>
@@ -69,7 +75,10 @@ export default function Dashboard({ onOpen }) {
             </div>
         </section>}
         <section className="panel client-dashboard-attention" aria-labelledby="client-attention-title">
-            <div className="panel-heading"><h2 id="client-attention-title">Needs attention</h2>
+            <div className="panel-heading"><h2 id="client-attention-title">
+                <CircleAlert size={18} aria-hidden="true" />Needs attention
+                <span className="client-attention-count">{overdueTasks.length}</span>
+            </h2>
                 {due !== 'overdue' && summary.overdue > 0 && <button type="button" className="text-button"
                     onClick={() => setDue('overdue')}>Show overdue only</button>}
             </div>

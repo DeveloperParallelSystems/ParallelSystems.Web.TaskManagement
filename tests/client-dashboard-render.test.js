@@ -42,16 +42,21 @@ test('client dashboard renders permission-scoped client cards without a project 
         const summary = html.match(/<section class="client-dashboard-summary"[\s\S]*?<\/section>/)[0];
         assert.equal((summary.match(/<article /g) || []).length, 4);
         for (const [label, value] of [['Tasks', 3], ['Overdue', 1], ['Due this week', 0], ['Without owner', 3]]) {
-            assert.match(summary, new RegExp(`aria-label="${label}"><span[^>]*>${label}</span><strong[^>]*>${value}</strong>`));
+            const card = summary.match(new RegExp(`<article[^>]*aria-label="${label}"[^>]*>[\\s\\S]*?</article>`))[0];
+            assert.match(card, new RegExp(`<span[^>]*>${label}<svg`));
+            assert.match(card, new RegExp(`<strong[^>]*>${value}</strong>`));
         }
         assert.match(summary, /across 3 clients|Needs attention|nothing coming up|needs assignment/);
         const acme = html.split('aria-label="&lt;Acme&gt; workload"')[1].split('</article>')[0];
         assert.match(acme, /<dt>Projects<\/dt><dd>1<\/dd>/);
-        assert.match(acme, /<dt>Overdue tasks<\/dt><dd class="overdue">1<\/dd>/);
+        assert.match(acme, /1 overdue/);
+        assert.doesNotMatch(acme, /<dt>Overdue tasks<\/dt>/);
         assert.match(acme, /<dt>Due this week<\/dt><dd>0<\/dd>/);
-        assert.match(acme, /<dt>Tasks without owner<\/dt><dd>2<\/dd>/);
+        assert.match(acme, /<dt>Without owner<\/dt><dd class="overdue">2<\/dd>/);
+        assert.match(acme, /aria-label="Open next task: &lt;script&gt;private title&lt;\/script&gt;"/);
         const empty = html.split('aria-label="Zero workload"')[1].split('</article>')[0];
-        assert.equal((empty.match(/<dd>0<\/dd>/g) || []).length, 4);
+        assert.equal((empty.match(/<dd>0<\/dd>/g) || []).length, 3);
+        assert.match(empty, /On track|No tasks match this date filter/);
         assert.match(html, /aria-label="Beta task metrics"/);
         assert.match(html, /aria-label="Unassigned task metrics"/);
         assert.match(html, /aria-label="General tasks task metrics"/);
@@ -178,11 +183,28 @@ export function useLocalToday() {
             return descendants(Card(props));
         }
         const toggle = () => renderCard().find((node) => node.props.className === 'button client-workload-toggle');
+        const preview = renderCard().find((node) => node.props.className === 'client-workload-next');
+        preview.props.onClick();
+        assert.equal(opened.at(-1), 'a-0');
+        const closedFirst = {
+            ...cardProps,
+            group: {
+                ...cardProps.group,
+                tasks: [{ ...tasks[0], status: 'Completed' }, ...cardProps.group.tasks.slice(1)],
+            },
+        };
+        renderCard(closedFirst).find((node) => node.props.className === 'client-workload-next').props.onClick();
+        assert.equal(opened.at(-1), 'a-1');
+        const closedOnly = {
+            ...cardProps,
+            group: { ...cardProps.group, tasks: [{ ...tasks[0], status: 'Cancelled' }] },
+        };
+        assert.equal(renderCard(closedOnly).some((node) => node.props.className === 'client-workload-next'), false);
         toggle().props.onClick();
         let taskButtons = renderCard().filter((node) => node.props.className === 'client-workload-task');
         assert.equal(taskButtons.length, 5);
         taskButtons[0].props.onClick();
-        assert.equal(opened[0], 'a-0');
+        assert.equal(opened.at(-1), 'a-0');
         renderCard().find((node) => node.props['aria-label'] === 'Next Client A tasks').props.onClick();
         taskButtons = renderCard().filter((node) => node.props.className === 'client-workload-task');
         assert.equal(taskButtons.length, 2);
